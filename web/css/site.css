@@ -1,0 +1,258 @@
+/* site.css - Versión optimizada */
+
+main > .container {
+    padding: 70px 15px 20px;
+}
+
+.footer {
+    background-color: #f5f5f5;
+    font-size: .9em;
+    height: 60px;
+    padding: 15px 0;
+    margin-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+.footer > .container {
+    padding-right: 15px;
+    padding-left: 15px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.not-set {
+    color: #c55;
+    font-style: italic;
+}
+
+/* GridView sorting icons */
+a.asc:after, a.desc:after {
+    content: '';
+    left: 3px;
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border: solid 5px transparent;
+    margin: 4px 4px 2px 4px;
+    background: transparent;
+}
+
+a.asc:after {
+    border-bottom: solid 7px #212529;
+    border-top-width: 0;
+}
+
+a.desc:after {
+    border-top: solid 7px #212529;
+    border-bottom-width: 0;
+}
+
+.grid-view th {
+    white-space: nowrap;
+}
+
+.hint-block {
+    display: block;
+    margin-top: 5px;
+    color: #999;
+}
+
+.error-summary {
+    color: #a94442;
+    background: #fdf7f7;
+    border-left: 3px solid #eed3d7;
+    padding: 10px 20px;
+    margin: 0 0 15px 0;
+}
+
+/* Navbar logout button */
+.nav li > form > button.logout {
+    padding-top: 7px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.nav li > form > button.logout:hover,
+.nav li > form > button.logout:focus {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.nav li > form > button.logout:focus {
+    outline: none;
+}
+
+@media(max-width:767px) {
+    .nav li > form > button.logout {
+        display: block;
+        text-align: left;
+        width: 100%;
+        padding: 10px 0;
+    }
+}
+
+/* Formularios */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+/* Cards */
+.card {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: 0.3s;
+    margin-bottom: 20px;
+    border: none;
+    border-radius: 10px;
+}
+
+.card:hover {
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    transform: translateY(-5px);
+}
+
+.dashboard-card, .summary-card {
+    border-radius: 10px;
+    height: 100%;
+}
+
+.summary-card .card-body {
+    text-align: center;
+}
+
+.summary-card .display-4 {
+    font-size: 2.5rem;
+    margin: 15px 0;
+}
+
+/* Paneles */
+.panel {
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.panel-heading {
+    padding: 10px 15px;
+}
+
+.panel-success .panel-heading {
+    background-color: #5cb85c;
+    color: white;
+}
+
+.panel-danger .panel-heading {
+    background-color: #d9534f;
+    color: white;
+}
+
+/* Tablas */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.table th {
+    background-color: #f8f9fa;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+/* Listas */
+.list-group-item {
+    padding: 12px 15px;
+    border-left: none;
+    border-right: none;
+}
+
+ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+ul li {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
+
+/* Badges */
+.badge {
+    background-color: #337ab7;
+    float: right;
+}
+
+.label-danger {
+    margin-left: 10px;
+}
+
+/* Jumbotron */
+.jumbotron {
+    background-color: #f8f9fa;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-radius: .3rem;
+}
+
+/* Textos */
+.text-muted {
+    color: #777;
+    font-size: 0.9em;
+}
+
+/* Página principal */
+.site-index {
+    padding: 20px;
+}
+
+/* Búsqueda de alumnos */
+.alumno-search {
+    margin-top: 20px;
+    padding: 15px;
+}
+
+/* Responsividad */
+@media (max-width: 768px) {
+    .col-md-6 {
+        margin-bottom: 20px;
+    }
+    
+    .footer > .container {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+/* Botones */
+.btn {
+    margin: 2px;
+    transition: all 0.3s;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Contenedor de documentos */
+#documento-container {
+    margin-top: 20px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    padding: 15px;
+    background: #fff;
+}
+
+#loading-spinner {
+    color: #337ab7;
+    padding: 20px;
+}
+
+/* Alertas */
+.alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+.alert i.fa {
+    margin-right: 10px;
+}
