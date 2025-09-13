@@ -21,11 +21,11 @@ use Yii;
  * @property Avancealumno[] $avancealumnos
  * @property Documentogenerado[] $documentogenerados
  * @property Requisito[] $requisitos
+ * @property RevisorTesis[] $revisorTesis
+ * @property Revisor[] $revisores
  */
 class Alumno extends \yii\db\ActiveRecord
 {
-
-
     /**
      * {@inheritdoc}
      */
@@ -101,12 +101,32 @@ class Alumno extends \yii\db\ActiveRecord
     {
         return $this->hasMany(Requisito::class, ['id' => 'requisito_id'])->viaTable('avancealumno', ['alumno_id' => 'id']);
     }
-public function getNombreCompleto()
+
+    /**
+     * Gets query for [[RevisorTesis]].
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    // Relación con RevisorTesis
+public function getRevisorTesis()
 {
-    return trim($this->nombre . ' ' . $this->apellido_paterno . ' ' . $this->apellido_materno);
+    return $this->hasMany(RevisorTesis::class, ['alumno_id' => 'id']);
 }
-public function getPrograma()
+
+// Relación con Revisores (a través de RevisorTesis)
+public function getRevisores()
 {
-    return $this->hasOne(Programa::className(), ['id' => 'programa_id']);
+    return $this->hasMany(Revisor::class, ['id' => 'revisor_id'])
+        ->via('revisorTesis');
 }
+
+    public function getNombreCompleto()
+    {
+        return trim($this->nombre . ' ' . $this->apellido_paterno . ' ' . $this->apellido_materno);
+    }
+
+    public function getPrograma()
+    {
+        return $this->hasOne(Programa::className(), ['id' => 'programa_id']);
+    }
 }

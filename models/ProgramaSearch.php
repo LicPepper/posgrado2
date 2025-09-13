@@ -17,7 +17,6 @@ class ProgramaSearch extends Programa
     public function rules()
     {
         return [
-            [['id'], 'integer'],
             [['nombre', 'nivel', 'descripcion'], 'safe'],
         ];
     }
@@ -58,10 +57,6 @@ class ProgramaSearch extends Programa
         }
 
         // grid filtering conditions
-        $query->andFilterWhere([
-            'id' => $this->id,
-        ]);
-
         $query->andFilterWhere(['like', 'nombre', $this->nombre])
             ->andFilterWhere(['like', 'nivel', $this->nivel])
             ->andFilterWhere(['like', 'descripcion', $this->descripcion]);

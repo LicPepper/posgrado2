@@ -6,49 +6,77 @@ use yii\widgets\DetailView;
 /** @var yii\web\View $this */
 /** @var app\models\DocumentoGenerado $model */
 
-$this->title = $model->id;
-$this->params['breadcrumbs'][] = ['label' => Yii::t('app', 'Documento Generados'), 'url' => ['index']];
+$this->title = 'Documento: ' . ($model->plantilla->nombre ?? 'N/A');
+$this->params['breadcrumbs'][] = ['label' => 'Documentos Generados', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 \yii\web\YiiAsset::register($this);
 ?>
-<div class="DocumentoGenerado-view">
+<div class="documento-generado-view">
 
-    <h1><?= Html::encode($this->title) ?></h1>
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h1 class="card-title">
+                <i class="fas fa-file-pdf"></i> <?= Html::encode($this->title) ?>
+            </h1>
+        </div>
+        <div class="card-body">
+            
+            <!-- Información del documento -->
+            <?= DetailView::widget([
+                'model' => $model,
+                'attributes' => [
+                   
+                    [
+                        'attribute' => 'plantilla_id',
+                        'value' => $model->plantilla->nombre ?? 'N/A'
+                    ],
+                    [
+                        'attribute' => 'ruta_archivo',
+                        'format' => 'raw',
+                        'value' => Html::a(basename($model->ruta_archivo), ['download', 'id' => $model->id], ['class' => 'btn btn-sm btn-outline-primary'])
+                    ],
+                    'fecha_generacion:datetime',
+                    [
+                        'attribute' => 'estado',
+                        'format' => 'raw',
+                        'value' => $model->getEstadoLabel()
+                    ],
+                    'version',
+                ],
+            ]) ?>
 
-    <p>
-        <?= Html::a(Yii::t('app', 'Update'), ['update', 'id' => $model->id], ['class' => 'btn btn-primary']) ?>
-        <?= Html::a(Yii::t('app', 'Delete'), ['delete', 'id' => $model->id], [
-            'class' => 'btn btn-danger',
-            'data' => [
-                'confirm' => Yii::t('app', 'Are you sure you want to delete this item?'),
-                'method' => 'post',
-            ],
-        ]) ?>
-    </p>
+            <!-- Visualizador del PDF -->
+            <div class="mt-4">
+                <h4><i class="fas fa-eye"></i> Vista previa del documento</h4>
+                <div class="embed-responsive embed-responsive-16by9" style="height: 600px;">
+                    <iframe class="embed-responsive-item" 
+                            src="<?= Yii::$app->urlManager->createUrl(['documento-generado/stream', 'id' => $model->id]) ?>" 
+                            frameborder="0" 
+                            style="width: 100%; height: 100%;">
+                    </iframe>
+                </div>
+            </div>
 
-    <?= DetailView::widget([
-    'model' => $model,
-    'attributes' => [
-        'id',
-        [
-            'attribute' => 'alumno_id',
-            'value' => $model->alumno->nombreCompleto ?? 'N/A'
-        ],
-        [
-            'attribute' => 'plantilla_id',
-            'value' => $model->plantilla->nombre ?? 'N/A'
-        ],
-        [
-            'attribute' => 'ruta_archivo',
-            'format' => 'raw',
-            'value' => Html::a(basename($model->ruta_archivo), ['download', 'id' => $model->id])
-        ],
-        'fecha_generacion:datetime',
-        [
-            'attribute' => 'estado',
-            'value' => $model->displayEstado()
-        ],
-    ],
-]) ?>
+            <!-- Botones de acción -->
+            <div class="mt-4">
+                <?= Html::a(
+                    '<i class="fas fa-download"></i> Descargar PDF', 
+                    ['download', 'id' => $model->id], 
+                    ['class' => 'btn btn-success btn-lg']
+                ) ?>
+                <?= Html::a(
+                    '<i class="fas fa-history"></i> Ver historial del alumno', 
+                    ['ver-historia', 'alumno_id' => $model->alumno_id], 
+                    ['class' => 'btn btn-info btn-lg']
+                ) ?>
+                <?= Html::a(
+                    '<i class="fas fa-arrow-left"></i> Volver al listado', 
+                    ['index'], 
+                    ['class' => 'btn btn-secondary']
+                ) ?>
+            </div>
+
+        </div>
+    </div>
 
 </div>

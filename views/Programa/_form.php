@@ -12,14 +12,27 @@ use yii\widgets\ActiveForm;
 
     <?php $form = ActiveForm::begin(); ?>
 
-    <?= $form->field($model, 'nombre')->textInput(['maxlength' => true]) ?>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <?= $form->field($model, 'nombre')->textInput(['maxlength' => true]) ?>
+                </div>
+                <div class="col-md-6">
+                    <?= $form->field($model, 'nivel')->dropDownList(
+                        $model::optsNivel(), 
+                        ['prompt' => 'Seleccione un nivel']
+                    ) ?>
+                </div>
+            </div>
 
-    <?= $form->field($model, 'nivel')->dropDownList([ 'Maestría' => 'Maestría', 'Doctorado' => 'Doctorado', ], ['prompt' => '']) ?>
+            <?= $form->field($model, 'descripcion')->textarea(['rows' => 4]) ?>
 
-    <?= $form->field($model, 'descripcion')->textarea(['rows' => 6]) ?>
-
-    <div class="form-group">
-        <?= Html::submitButton(Yii::t('app', 'Save'), ['class' => 'btn btn-success']) ?>
+            <div class="form-group">
+                <?= Html::submitButton('<i class="fas fa-save"></i> ' . Yii::t('app', 'Guardar'), ['class' => 'btn btn-success']) ?>
+                <?= Html::a('<i class="fas fa-times"></i> ' . Yii::t('app', 'Cancelar'), ['index'], ['class' => 'btn btn-secondary']) ?>
+            </div>
+        </div>
     </div>
 
     <?php ActiveForm::end(); ?>

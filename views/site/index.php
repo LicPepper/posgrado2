@@ -46,7 +46,7 @@ use yii\bootstrap5\Alert;
 
             <?php ActiveForm::end(); ?>
         </div>
-    </div>
+    </div>>
 
     <!-- Mensajes flash -->
     <?php

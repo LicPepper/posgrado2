@@ -2,52 +2,159 @@
 
 namespace app\models;
 
-class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
+use Yii;
+use yii\db\ActiveRecord;
+use yii\web\IdentityInterface;
+
+/**
+ * This is the model class for table "usuario".
+ *
+ * @property int $id
+ * @property string $username
+ * @property string $password_hash
+ * @property string $nombre
+ * @property string $email
+ * @property string $rol
+ * @property int $activo
+ * @property string $fecha_creacion
+ */
+class User extends ActiveRecord implements IdentityInterface
 {
-    public $id;
-    public $username;
-    public $password;
-    public $authKey;
-    public $accessToken;
-
-    private static $users = [
-        '100' => [
-            'id' => '100',
-            'username' => 'admin',
-            'password' => 'admin',
-            'authKey' => 'test100key',
-            'accessToken' => '100-token',
-        ],
-        '101' => [
-            'id' => '101',
-            'username' => 'demo',
-            'password' => 'demo',
-            'authKey' => 'test101key',
-            'accessToken' => '101-token',
-        ],
-    ];
-
+    /**
+     * ENUM field values
+     */
+    const ROL_ADMINISTRADOR = 'Administrador';
+    const ROL_MODERADOR = 'Moderador';
+    const ROL_ASISTENTE = 'Asistente';
 
     /**
      * {@inheritdoc}
      */
-    public static function findIdentity($id)
+    public static function tableName()
     {
-        return isset(self::$users[$id]) ? new static(self::$users[$id]) : null;
+        return 'usuario';
     }
 
     /**
      * {@inheritdoc}
      */
+   public function rules()
+{
+    return [
+        [['username', 'password_hash', 'nombre', 'email', 'rol'], 'required'],
+        [['password_hash'], 'required', 'on' => 'create'], 
+        [['rol'], 'string'],
+        [['activo'], 'integer'],
+        [['username'], 'string', 'max' => 50],
+        [['password_hash'], 'string', 'max' => 255],
+        [['nombre', 'email'], 'string', 'max' => 100],
+        [['username'], 'unique'],
+    ];
+}
+
+    /**
+     * {@inheritdoc}
+     */
+    public function attributeLabels()
+    {
+        return [
+            'id' => 'ID',
+            'username' => 'Usuario',
+            'password_hash' => 'Contraseña',
+            'nombre' => 'Nombre',
+            'email' => 'Email',
+            'rol' => 'Rol',
+            'activo' => 'Activo',
+        ];
+    }
+
+    /**
+     * column rol ENUM value labels
+     * @return string[]
+     */
+    public static function optsRol()
+    {
+        return [
+            self::ROL_ADMINISTRADOR => 'Administrador',
+            self::ROL_MODERADOR => 'Moderador',
+            self::ROL_ASISTENTE => 'Asistente',
+        ];
+    }
+
+    /**
+     * @return string
+     */
+    public function displayRol()
+    {
+        return self::optsRol()[$this->rol] ?? $this->rol;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isAdministrador()
+    {
+        return $this->rol === self::ROL_ADMINISTRADOR;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isModerador()
+    {
+        return $this->rol === self::ROL_MODERADOR;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isAsistente()
+    {
+        return $this->rol === self::ROL_ASISTENTE;
+    }
+
+    /**
+     * Verifica permisos según el rol
+     */
+    public function puede($accion)
+    {
+        switch ($accion) {
+            case 'ver':
+                return true; // Todos pueden ver
+            case 'crear':
+            case 'editar':
+                return $this->isAdministrador() || $this->isModerador();
+            case 'eliminar':
+                return $this->isAdministrador();
+            default:
+                return false;
+        }
+    }
+
+    // Métodos de IdentityInterface
+    public static function findIdentity($id)
+    {
+        return static::findOne(['id' => $id, 'activo' => 1]);
+    }
+
     public static function findIdentityByAccessToken($token, $type = null)
     {
-        foreach (self::$users as $user) {
-            if ($user['accessToken'] === $token) {
-                return new static($user);
-            }
-        }
-
         return null;
+    }
+
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    public function getAuthKey()
+    {
+        return null;
+    }
+
+    public function validateAuthKey($authKey)
+    {
+        return false;
     }
 
     /**
@@ -58,47 +165,22 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
      */
     public static function findByUsername($username)
     {
-        foreach (self::$users as $user) {
-            if (strcasecmp($user['username'], $username) === 0) {
-                return new static($user);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getId()
-    {
-        return $this->id;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getAuthKey()
-    {
-        return $this->authKey;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function validateAuthKey($authKey)
-    {
-        return $this->authKey === $authKey;
+        return static::findOne(['username' => $username, 'activo' => 1]);
     }
 
     /**
      * Validates password
-     *
-     * @param string $password password to validate
-     * @return bool if password provided is valid for current user
      */
     public function validatePassword($password)
     {
-        return $this->password === $password;
+        return Yii::$app->security->validatePassword($password, $this->password_hash);
+    }
+
+    /**
+     * Sets password
+     */
+    public function setPassword($password)
+    {
+        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
     }
 }

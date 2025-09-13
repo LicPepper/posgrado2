@@ -1,3 +1,4 @@
+
 <?php
 /** @var yii\web\View $this */
 /** @var string $content */
@@ -21,93 +22,63 @@ $this->registerLinkTag([
     'type' => 'image/x-icon',
     'href' => Yii::getAlias('@web/favicon.ico')
 ]);
+
+// Registro de recursos CSS
+$this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+$this->registerCssFile('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Nunito:wght@600;700&display=swap');
+
+// CSS personalizado
+$this->registerCss(<<<CSS
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f5f7fa;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+}
+
+.main-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+    padding: 25px;
+    margin-top: 20px;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--primary-color);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.dropdown-menu {
+    border-radius: 0.25rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item:focus, .dropdown-item:hover {
+    background-color: #f8f9fa;
+    color: var(--primary-color);
+}
+CSS
+);
 ?>
 <?php $this->beginPage() ?>
 <!DOCTYPE html>
 <html lang="<?= Yii::$app->language ?>" class="h-100">
 <head>
     <title><?= Html::encode($this->title) ?> | Sistema de Documentos de Posgrado</title>
-    <?php
-    // Fuentes e iconos
-    $this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
-    $this->registerCssFile('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Nunito:wght@600;700&display=swap');
-    
-    // CSS personalizado
-    $this->registerCss(<<<CSS
-    :root {
-        --primary-color: #2c3e50;
-        --secondary-color: #3498db;
-        --success-color: #28a745;
-        --danger-color: #dc3545;
-        --warning-color: #ffc107;
-        --info-color: #17a2b8;
-        --light-color: #f8f9fa;
-        --dark-color: #343a40;
-    }
-    
-    body {
-        font-family: 'Roboto', sans-serif;
-        background-color: #f5f7fa;
-    }
-    
-    .navbar-brand {
-        font-weight: 700;
-        font-family: 'Nunito', sans-serif;
-    }
-    
-    .main-container {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 15px rgba(0,0,0,0.05);
-        padding: 25px;
-        margin-top: 20px;
-    }
-    
-    .nav-pills .nav-link.active {
-        background-color: var(--primary-color);
-    }
-    
-    .btn-primary {
-        background-color: var(--primary-color);
-        border-color: var(--primary-color);
-    }
-    
-    .bg-primary {
-        background-color: var(--primary-color) !important;
-    }
-    
-    /* Estilos para el menú desplegable */
-    .dropdown-menu {
-        border-radius: 0.25rem;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
-    
-    .dropdown-item:focus, .dropdown-item:hover {
-        background-color: #f8f9fa;
-        color: var(--primary-color);
-    }
-    
-    /* Mejoras para el breadcrumb */
-    .breadcrumb {
-        background-color: transparent;
-        padding: 0.5rem 0;
-    }
-    
-    /* Estilos para las tarjetas */
-    .card {
-        border: none;
-        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-        margin-bottom: 20px;
-    }
-    
-    .card-header {
-        border-bottom: 1px solid rgba(0,0,0,.05);
-    }
-CSS
-    );
-    
-    $this->head();
-    ?>
+    <?php $this->head() ?>
 </head>
 <body class="d-flex flex-column h-100">
 <?php $this->beginBody() ?>
@@ -115,7 +86,7 @@ CSS
 <header>
     <?php
     NavBar::begin([
-        'brandLabel' => Html::img('@web/images/logo-itvh.png', [
+        'brandLabel' => Html::img('@web/images/tecnm-logo.png', [
             'alt' => 'IT Villahermosa',
             'style' => 'height: 40px; margin-right: 10px;'
         ]) . 'Sistema de Documentos - Posgrado',
@@ -125,90 +96,89 @@ CSS
         ],
     ]);
 
-    // Elementos del menú principal
     $menuItems = [
-        [
-            'label' => '<i class="fas fa-home"></i> Inicio',
-            'url' => ['/site/index'],
-            'linkOptions' => ['class' => 'nav-link']
-        ],
+        ['label' => '<i class="fas fa-home"></i> Inicio', 'url' => ['/site/index']],
         [
             'label' => '<i class="fas fa-users"></i> Alumnos',
             'items' => [
                 ['label' => '<i class="fas fa-list"></i> Listado', 'url' => ['/alumno/index']],
                 ['label' => '<i class="fas fa-search"></i> Buscar', 'url' => ['/alumno/buscar']],
                 '<div class="dropdown-divider"></div>',
-                
+                ['label' => '<i class="fas fa-plus"></i> Nuevo alumno', 'url' => ['/alumno/create']],
             ],
             'linkOptions' => ['class' => 'nav-link dropdown-toggle'],
             'dropDownOptions' => ['class' => 'dropdown-menu']
         ],
-        
         [
-            'label' => '<i class="fas fa-cog"></i> Configuración',
+            'label' => '<i class="fas fa-user-tie"></i> Revisores',
             'items' => [
-                ['label' => '<i class="fas fa-graduation-cap"></i> Programas', 'url' => ['/programa/index']],
-                ['label' => '<i class="fas fa-tasks"></i> Requisitos', 'url' => ['/requisito/index']],
+                ['label' => '<i class="fas fa-list"></i> Listado', 'url' => ['/revisor/index']],
                 '<div class="dropdown-divider"></div>',
-                ['label' => '<i class="fas fa-users-cog"></i> Usuarios', 'url' => ['/usuario/index']],
+                ['label' => '<i class="fas fa-plus"></i> Nuevo revisor', 'url' => ['/revisor/create']],
             ],
-            'visible' => Yii::$app->user->can('administrador'),
+            'linkOptions' => ['class' => 'nav-link dropdown-toggle'],
+            'dropDownOptions' => ['class' => 'dropdown-menu']
+        ],
+        // MENÚ DE REQUISITOS AGREGADO AQUÍ
+        [
+            'label' => '<i class="fas fa-list-check"></i> Requisitos',
+            'items' => [
+                ['label' => '<i class="fas fa-list"></i> Ver Todos', 'url' => ['/requisito/index']],
+                ['label' => '<i class="fas fa-cog"></i> Administrar por Documento', 'url' => ['/requisito/admin']],
+                '<div class="dropdown-divider"></div>',
+                ['label' => '<i class="fas fa-plus"></i> Crear Nuevo', 'url' => ['/requisito/create']],
+            ],
+            'linkOptions' => ['class' => 'nav-link dropdown-toggle'],
+            'dropDownOptions' => ['class' => 'dropdown-menu']
+        ],
+        [
+            'label' => '<i class="fas fa-graduation-cap"></i> Programas',
+            'items' => [
+                ['label' => '<i class="fas fa-list"></i> Listado', 'url' => ['/programa/index']],
+                '<div class="dropdown-divider"></div>',
+                ['label' => '<i class="fas fa-plus"></i> Nuevo Programa', 'url' => ['/programa/create']],
+            ],
             'linkOptions' => ['class' => 'nav-link dropdown-toggle'],
             'dropDownOptions' => ['class' => 'dropdown-menu']
         ],
     ];
 
-    // Elementos del menú derecho (usuario)
-    $rightMenuItems = [
-        Yii::$app->user->isGuest ? (
-            ['label' => '<i class="fas fa-sign-in-alt"></i> Iniciar sesión', 'url' => ['/site/login']]
-        ) : (
-            '<li class="nav-item dropdown">'
-            . Html::a(
-                '<i class="fas fa-user-circle"></i> ' . Html::encode(Yii::$app->user->identity->username),
-                '#',
+    // Menú para usuarios autenticados
+    if (!Yii::$app->user->isGuest) {
+        $menuItems[] = [
+            'label' => '<i class="fas fa-user-circle"></i> ' . Html::encode(Yii::$app->user->identity->username),
+            'items' => [
                 [
-                    'class' => 'nav-link dropdown-toggle',
-                    'data-bs-toggle' => 'dropdown',
-                    'aria-expanded' => 'false',
-                    'id' => 'userDropdown'
-                ]
-            )
-            . '<div class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">'
-            . Html::a(
-                '<i class="fas fa-user"></i> Mi perfil',
-                ['/usuario/view', 'id' => Yii::$app->user->id],
-                ['class' => 'dropdown-item']
-            )
-            . Html::a(
-                '<i class="fas fa-cog"></i> Configuración',
-                ['/usuario/update', 'id' => Yii::$app->user->id],
-                ['class' => 'dropdown-item']
-            )
-            . '<div class="dropdown-divider"></div>'
-            . Html::beginForm(['/site/logout'], 'post', ['class' => 'd-inline'])
-            . Html::submitButton(
-                '<i class="fas fa-sign-out-alt"></i> Cerrar sesión',
-                ['class' => 'dropdown-item']
-            )
-            . Html::endForm()
-            . '</div>'
-            . '</li>'
-        )
-    ];
+                    'label' => '<i class="fas fa-user"></i> Mi perfil',
+                    'url' => ['/usuario/view', 'id' => Yii::$app->user->id],
+                    'linkOptions' => ['class' => 'dropdown-item']
+                ],
+                [
+                    'label' => '<i class="fas fa-cog"></i> Configuración',
+                    'url' => ['/usuario/update', 'id' => Yii::$app->user->id],
+                    'linkOptions' => ['class' => 'dropdown-item']
+                ],
+                '<div class="dropdown-divider"></div>',
+                Html::beginForm(['/site/logout'], 'post', ['class' => 'd-inline'])
+                . Html::submitButton(
+                    '<i class="fas fa-sign-out-alt"></i> Cerrar sesión',
+                    ['class' => 'dropdown-item btn btn-link']
+                )
+                . Html::endForm()
+            ],
+            'options' => ['class' => 'nav-item dropdown'],
+            'linkOptions' => ['class' => 'nav-link dropdown-toggle', 'data-bs-toggle' => 'dropdown']
+        ];
+    } else {
+        $menuItems[] = ['label' => '<i class="fas fa-sign-in-alt"></i> Iniciar sesión', 'url' => ['/site/login']];
+    }
 
     echo Nav::widget([
         'options' => ['class' => 'navbar-nav me-auto mb-2 mb-md-0'],
         'items' => $menuItems,
         'encodeLabels' => false,
     ]);
-
-    echo Nav::widget([
-        'options' => ['class' => 'navbar-nav ms-auto'],
-        'items' => $rightMenuItems,
-        'encodeLabels' => false,
-    ]);
-
+    
     NavBar::end();
     ?>
 </header>
@@ -257,3 +227,4 @@ CSS
 </body>
 </html>
 <?php $this->endPage() ?>
+[file content end]

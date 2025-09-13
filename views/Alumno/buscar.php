@@ -1,6 +1,7 @@
 <?php
 use yii\helpers\Html;
 use yii\widgets\ActiveForm;
+use yii\grid\GridView;
 ?>
 
 <div class="alumno-buscar">
@@ -19,7 +20,7 @@ use yii\widgets\ActiveForm;
 
             <div class="row align-items-end">
                 <div class="col-md-8">
-                    <?= $form->field($model, 'matricula', [
+                    <?= $form->field($searchModel, 'matricula', [
                         'inputOptions' => [
                             'placeholder' => 'Ejemplo: 2023001',
                             'class' => 'form-control form-control-lg',

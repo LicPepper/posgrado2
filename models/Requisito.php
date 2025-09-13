@@ -8,7 +8,8 @@ use Yii;
  * This is the model class for table "requisito".
  *
  * @property int $id
- * @property int $programa_id
+ * @property int|null $programa_id
+ * @property string $tipo_documento
  * @property string $nombre
  * @property string|null $descripcion
  * @property int $obligatorio
@@ -20,8 +21,6 @@ use Yii;
  */
 class Requisito extends \yii\db\ActiveRecord
 {
-
-
     /**
      * {@inheritdoc}
      */
@@ -36,13 +35,13 @@ class Requisito extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['descripcion'], 'default', 'value' => null],
-            [['obligatorio'], 'default', 'value' => 1],
-            [['orden'], 'default', 'value' => 0],
-            [['programa_id', 'nombre'], 'required'],
             [['programa_id', 'obligatorio', 'orden'], 'integer'],
+            
             [['descripcion'], 'string'],
-            [['nombre'], 'string', 'max' => 100],
+            [['tipo_documento'], 'string', 'max' => 50],
+            [['tipo_documento'], 'in', 'range' => array_keys(self::getTiposDocumentos())],
+            [['obligatorio'], 'default', 'value' => 1],
+            [['orden'], 'integer', 'min' => 1],
             [['programa_id'], 'exist', 'skipOnError' => true, 'targetClass' => Programa::class, 'targetAttribute' => ['programa_id' => 'id']],
         ];
     }
@@ -53,19 +52,18 @@ class Requisito extends \yii\db\ActiveRecord
     public function attributeLabels()
     {
         return [
-            'id' => Yii::t('app', 'ID'),
-            'programa_id' => Yii::t('app', 'Programa ID'),
-            'nombre' => Yii::t('app', 'Nombre'),
-            'descripcion' => Yii::t('app', 'Descripcion'),
-            'obligatorio' => Yii::t('app', 'Obligatorio'),
-            'orden' => Yii::t('app', 'Orden'),
+            'id' => 'ID',
+            'programa_id' => 'Programa',
+            'tipo_documento' => 'Tipo de Documento',
+            'nombre' => 'Nombre del Requisito',
+            'descripcion' => 'Descripción',
+            'obligatorio' => 'Obligatorio',
+            'orden' => 'Orden',
         ];
     }
 
     /**
      * Gets query for [[Alumnos]].
-     *
-     * @return \yii\db\ActiveQuery
      */
     public function getAlumnos()
     {
@@ -74,8 +72,6 @@ class Requisito extends \yii\db\ActiveRecord
 
     /**
      * Gets query for [[Avancealumnos]].
-     *
-     * @return \yii\db\ActiveQuery
      */
     public function getAvancealumnos()
     {
@@ -84,12 +80,55 @@ class Requisito extends \yii\db\ActiveRecord
 
     /**
      * Gets query for [[Programa]].
-     *
-     * @return \yii\db\ActiveQuery
      */
     public function getPrograma()
     {
         return $this->hasOne(Programa::class, ['id' => 'programa_id']);
     }
 
+    /**
+     * Obtiene los tipos de documentos disponibles
+     */
+    public static function getTiposDocumentos()
+    {
+        return [
+            'LiberacionIngles' => 'Liberación de Inglés',
+            'LiberacionTesis' => 'Liberación de Tesis',
+            'Estancia' => 'Carta de Estancia',
+            'Constancia' => 'Constancia General',
+            'Kardex' => 'Kardex',
+            
+        ];
+    }
+
+    /**
+     * Obtiene los requisitos para un tipo de documento específico
+     */
+    public static function getRequisitosPorTipo($tipo)
+    {
+        return self::find()
+            ->where(['tipo_documento' => $tipo])
+            ->orderBy(['orden' => SORT_ASC])
+            ->all();
+    }
+
+    /**
+     * Verifica si un alumno cumple con todos los requisitos para un documento
+     */
+    public static function verificarCumplimiento($alumnoId, $tipoDocumento)
+    {
+        $requisitos = self::getRequisitosPorTipo($tipoDocumento);
+        
+        foreach ($requisitos as $requisito) {
+            $avance = Avancealumno::find()
+                ->where(['alumno_id' => $alumnoId, 'requisito_id' => $requisito->id, 'completado' => 1])
+                ->exists();
+            
+            if (!$avance) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
 }

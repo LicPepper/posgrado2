@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use Yii;
 use app\models\Programa;
 use app\models\ProgramaSearch;
 use yii\web\Controller;
@@ -16,6 +17,16 @@ class ProgramaController extends Controller
     /**
      * @inheritDoc
      */
+
+    protected function checkAccess($accion)
+    {
+        $user = Yii::$app->user->identity;
+        
+        if (!$user || !$user->puede($accion)) {
+            throw new ForbiddenHttpException('No tienes permisos para realizar esta acción.');
+        }
+    }
+
     public function behaviors()
     {
         return array_merge(
@@ -36,6 +47,28 @@ class ProgramaController extends Controller
      *
      * @return string
      */
+
+     public function beforeAction($action)
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        $permisos = [
+            'index' => 'ver',
+            'view' => 'ver',
+            'create' => 'crear',
+            'update' => 'editar',
+            'delete' => 'eliminar',
+        ];
+
+        if (isset($permisos[$action->id])) {
+            $this->checkAccess($permisos[$action->id]);
+        }
+
+        return true;
+    }
+
     public function actionIndex()
     {
         $searchModel = new ProgramaSearch();
@@ -110,11 +143,24 @@ class ProgramaController extends Controller
      * @throws NotFoundHttpException if the model cannot be found
      */
     public function actionDelete($id)
-    {
-        $this->findModel($id)->delete();
-
+{
+    $model = $this->findModel($id);
+    
+    // Verificar si hay registros relacionados
+    if ($model->getPlantilladocumentos()->count() > 0 || $model->getRequisitos()->count() > 0) {
+        Yii::$app->session->setFlash('error', 'No se puede eliminar el programa porque tiene registros relacionados.');
         return $this->redirect(['index']);
     }
+    
+    try {
+        $model->delete();
+        Yii::$app->session->setFlash('success', 'Programa eliminado correctamente.');
+    } catch (\Exception $e) {
+        Yii::$app->session->setFlash('error', 'Error al eliminar el programa: ' . $e->getMessage());
+    }
+
+    return $this->redirect(['index']);
+}
 
     /**
      * Finds the Programa model based on its primary key value.

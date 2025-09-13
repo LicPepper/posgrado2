@@ -11,6 +11,8 @@ use app\models\LoginForm;
 use app\models\ContactForm;
 use app\models\Alumno;
 use app\models\DocumentoGenerado;
+use app\models\AvanceAlumno;
+use app\models\User;
 
 class SiteController extends Controller
 {
@@ -61,27 +63,42 @@ class SiteController extends Controller
      *
      * @return string
      */
-   public function actionIndex()
-{
-    $model = new \app\models\Alumno();
-    $searchPerformed = Yii::$app->request->get('Alumno') !== null;
+    public function actionIndex()
+    {
+        $model = new \app\models\Alumno();
+        $alumnoEncontrado = null;
+        $searchPerformed = false;
 
-    // Obtener estadísticas
-    $totalAlumnos = \app\models\Alumno::find()->count();
-    $totalDocumentos = \app\models\DocumentoGenerado::find()->count();
-    $totalRequisitos = \app\models\AvanceAlumno::find()
-        ->where(['completado' => 1])
-        ->count();
+        // Verificar si se está realizando una búsqueda
+        if (Yii::$app->request->get('Alumno')) {
+            $matricula = Yii::$app->request->get('Alumno')['matricula'] ?? '';
+            
+            if (!empty($matricula)) {
+                $searchPerformed = true;
+                $alumnoEncontrado = Alumno::find()->where(['matricula' => $matricula])->one();
+                
+                if ($alumnoEncontrado === null) {
+                    Yii::$app->session->setFlash('error', "No se encontró ningún alumno con la matrícula: $matricula");
+                }
+            }
+        }
 
-    return $this->render('index', [
-        'model' => $model,
-        'searchPerformed' => $searchPerformed,
-        'totalAlumnos' => $totalAlumnos,
-        'totalDocumentos' => $totalDocumentos,
-        'totalRequisitos' => $totalRequisitos
-    ]);
-}
+        // Obtener estadísticas
+        $totalAlumnos = Alumno::find()->count();
+        $totalDocumentos = DocumentoGenerado::find()->count();
+        $totalRequisitos = AvanceAlumno::find()
+            ->where(['completado' => 1])
+            ->count();
 
+        return $this->render('index', [
+            'model' => $model,
+            'alumnoEncontrado' => $alumnoEncontrado,
+            'searchPerformed' => $searchPerformed,
+            'totalAlumnos' => $totalAlumnos,
+            'totalDocumentos' => $totalDocumentos,
+            'totalRequisitos' => $totalRequisitos
+        ]);
+    }
 
     /**
      * Login action.
@@ -95,8 +112,27 @@ class SiteController extends Controller
         }
 
         $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            return $this->goBack();
+        
+        if ($model->load(Yii::$app->request->post())) {
+            // Debug: ver qué está llegando
+            Yii::debug('Username: ' . $model->username);
+            Yii::debug('Password: ' . $model->password);
+            
+            $user = User::findByUsername($model->username);
+            if ($user) {
+                Yii::debug('Usuario encontrado: ' . $user->username);
+                Yii::debug('Password hash: ' . $user->password_hash);
+                Yii::debug('Validation: ' . ($user->validatePassword($model->password) ? 'true' : 'false'));
+            } else {
+                Yii::debug('Usuario NO encontrado');
+            }
+            
+            if ($model->login()) {
+                Yii::debug('Login exitoso');
+                return $this->goBack();
+            } else {
+                Yii::debug('Login fallido - Errores: ' . print_r($model->errors, true));
+            }
         }
 
         $model->password = '';
@@ -144,5 +180,4 @@ class SiteController extends Controller
     {
         return $this->render('about');
     }
-    
 }

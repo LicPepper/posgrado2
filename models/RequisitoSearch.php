@@ -18,7 +18,7 @@ class RequisitoSearch extends Requisito
     {
         return [
             [['id', 'programa_id', 'obligatorio', 'orden'], 'integer'],
-            [['nombre', 'descripcion'], 'safe'],
+            [['tipo_documento', 'nombre', 'descripcion'], 'safe'],
         ];
     }
 
@@ -66,7 +66,8 @@ class RequisitoSearch extends Requisito
         ]);
 
         $query->andFilterWhere(['like', 'nombre', $this->nombre])
-            ->andFilterWhere(['like', 'descripcion', $this->descripcion]);
+            ->andFilterWhere(['like', 'descripcion', $this->descripcion])
+            ->andFilterWhere(['like', 'tipo_documento', $this->tipo_documento]);
 
         return $dataProvider;
     }

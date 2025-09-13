@@ -56,7 +56,7 @@ class DocumentoGeneradoController extends Controller
         $searchModel = new DocumentoGeneradoSearch();
         $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
 
-        return $this->render('index', [
+        return $this->render('@app/views/DocumentoGenerado/index', [
             'searchModel' => $searchModel,
             'dataProvider' => $dataProvider,
         ]);
@@ -74,7 +74,7 @@ class DocumentoGeneradoController extends Controller
             return $this->redirect(['index']);
         }
         
-        return $this->render('view', [
+        return $this->render('@app/views/DocumentoGenerado/view', [
             'model' => $model,
         ]);
     }
@@ -93,7 +93,6 @@ class DocumentoGeneradoController extends Controller
             $tipoDocumento = $request->post('tipo_documento');
             
             Yii::info("Datos recibidos - alumnoId: $alumnoId, tipoDocumento: $tipoDocumento", 'app');
-            Yii::info("Datos POST completos: " . print_r($request->post(), true), 'app');
 
             // Validaciones básicas
             if (empty($alumnoId)) {
@@ -121,20 +120,7 @@ class DocumentoGeneradoController extends Controller
             ];
 
             // Búsqueda de plantilla
-            $plantilla = null;
-            if (isset($mapeoTipos[$tipoDocumento])) {
-                foreach ($mapeoTipos[$tipoDocumento] as $variacion) {
-                    $plantilla = PlantillaDocumento::find()
-                        ->where(['tipo' => $variacion])
-                        ->andWhere(['OR', 
-                            ['programa_id' => $alumno->programa_id],
-                            ['programa_id' => null]
-                        ])
-                        ->one();
-                    if ($plantilla) break;
-                }
-            }
-
+            $plantilla = $this->buscarPlantilla($tipoDocumento, $mapeoTipos, $alumno);
             if (!$plantilla) {
                 throw new \Exception("No se encontró plantilla para el tipo: $tipoDocumento");
             }
@@ -151,31 +137,7 @@ class DocumentoGeneradoController extends Controller
             ];
 
             // Parámetros específicos por tipo de documento
-            switch ($tipoDocumento) {
-                case 'LiberacionIngles':
-                    $params['articulo'] = $request->post('articulo', 'Artículo de investigación en inglés');
-                    $view = '_liberacion-ingles';
-                    break;
-                    
-                case 'Estancia':
-                    $params['fechaInicio'] = $request->post('fecha_inicio', date('d/m/Y'));
-                    $params['fechaFin'] = $request->post('fecha_fin', date('d/m/Y', strtotime('+1 month')));
-                    $params['asesor'] = $request->post('asesor', 'MCIB. Juana Selvan García');
-                    $params['proyecto'] = $request->post('proyecto', 'Tesis de '.$alumno->programa->nombre);
-                    $view = '_estancia';
-                    break;
-                    
-                case 'Constancia':
-                    $view = '_constancia';
-                    break;
-                    
-                case 'LiberacionTesis':
-                    $view = '_liberaciontesis';
-                    break;
-                    
-                default:
-                    throw new \Exception('Tipo de documento no válido');
-            }
+            $view = $this->obtenerVistaPorTipo($tipoDocumento, $request, $alumno, $params);
 
             // Configurar directorios
             $this->verificarDirectorios();
@@ -198,28 +160,12 @@ class DocumentoGeneradoController extends Controller
             $pdf->Output($rutaCompleta, \Mpdf\Output\Destination::FILE);
 
             // Registrar en base de datos
-            $documento = new DocumentoGenerado();
-            $documento->alumno_id = $alumno->id;
-            $documento->plantilla_id = $plantilla->id;
-            $documento->ruta_archivo = $rutaArchivo;
-            $documento->hash_verificacion = md5_file($rutaCompleta);
-            $documento->fecha_generacion = date('Y-m-d H:i:s');
-            $documento->generado_por = Yii::$app->user->id;
-            $documento->version = 1;
-            $documento->estado = DocumentoGenerado::ESTADO_GENERADO;
-            
-            if (!$documento->save()) {
-                // Eliminar archivo si falla el guardado en BD
-                if (file_exists($rutaCompleta)) {
-                    unlink($rutaCompleta);
-                }
-                throw new \Exception('Error al guardar documento: ' . json_encode($documento->errors));
-            }
+            $documento = $this->guardarDocumentoBD($alumno, $plantilla, $rutaArchivo, $rutaCompleta);
 
             Yii::info("Documento generado exitosamente: ID {$documento->id}", 'app');
             return [
                 'success' => true,
-                'pdfUrl' => Url::to(['/documento-generado/view-pdf', 'id' => $documento->id], true),
+                'pdfUrl' => Url::to(['/documento-generado/stream', 'id' => $documento->id], true),
                 'downloadUrl' => Url::to(['/documento-generado/download', 'id' => $documento->id], true),
                 'documentoId' => $documento->id,
                 'historialUrl' => Url::to(['/documento-generado/ver-historia', 'alumno_id' => $alumno->id], true)
@@ -236,53 +182,151 @@ class DocumentoGeneradoController extends Controller
     }
 
     /**
-     * Valida requisitos específicos para cada tipo de documento
+     * Busca plantilla por tipo de documento
      */
-    private function validarRequisitos($tipo, $alumno)
+    private function buscarPlantilla($tipoDocumento, $mapeoTipos, $alumno)
     {
-        // Requisitos generales obligatorios
-        $requisitosObligatorios = AvanceAlumno::find()
-            ->joinWith('requisito')
-            ->where([
-                'alumno_id' => $alumno->id,
-                'completado' => 0,
-                'requisito.obligatorio' => 1
-            ])
-            ->all();
-
-        if (!empty($requisitosObligatorios)) {
-            $pendientes = array_map(function($item) {
-                return $item->requisito->nombre;
-            }, $requisitosObligatorios);
-            
-            return 'Requisitos obligatorios pendientes: '.implode(', ', $pendientes);
-        }
-
-        // Validación específica para Liberación de Inglés
-        if ($tipo === 'LiberacionIngles') {
-            $articulo = Yii::$app->request->post('articulo');
-            if (empty($articulo)) {
-                return 'Para generar la Liberación de Inglés debe proporcionar el título del artículo';
-            }
-            
-            // Verificación más flexible del requisito de inglés
-            $requisitoIngles = AvanceAlumno::find()
-                ->joinWith('requisito')
-                ->where([
-                    'alumno_id' => $alumno->id,
-                    'completado' => 1
-                ])
-                ->andWhere(['like', 'requisito.nombre', 'inglés'])
-                ->one();
-
-            if (!$requisitoIngles) {
-                return 'El alumno no ha completado el requisito de idioma inglés';
+        if (isset($mapeoTipos[$tipoDocumento])) {
+            foreach ($mapeoTipos[$tipoDocumento] as $variacion) {
+                $plantilla = PlantillaDocumento::find()
+                    ->where(['tipo' => $variacion])
+                    ->andWhere(['OR', 
+                        ['programa_id' => $alumno->programa_id],
+                        ['programa_id' => null]
+                    ])
+                    ->one();
+                if ($plantilla) return $plantilla;
             }
         }
-
         return null;
     }
 
+    /**
+     * Obtiene la vista según el tipo de documento
+     */
+    private function obtenerVistaPorTipo($tipoDocumento, $request, $alumno, &$params)
+    {
+        switch ($tipoDocumento) {
+            case 'LiberacionIngles':
+                $params['articulo'] = $request->post('articulo', 'Artículo de investigación en inglés');
+                return '_liberacion-ingles';
+                
+            case 'Estancia':
+                $params['fechaInicio'] = $request->post('fecha_inicio', date('d/m/Y'));
+                $params['fechaFin'] = $request->post('fecha_fin', date('d/m/Y', strtotime('+1 month')));
+                $params['asesor'] = $request->post('asesor', 'MCIB. Juana Selvan García');
+                $params['proyecto'] = $request->post('proyecto', 'Tesis de '.$alumno->programa->nombre);
+                return '_estancia';
+                
+            case 'Constancia':
+                return '_constancia';
+                
+            case 'LiberacionTesis':
+                return '_liberaciontesis';
+                
+            default:
+                throw new \Exception('Tipo de documento no válido');
+        }
+    }
+
+    /**
+     * Guarda documento en base de datos
+     */
+    private function guardarDocumentoBD($alumno, $plantilla, $rutaArchivo, $rutaCompleta)
+    {
+        $documento = new DocumentoGenerado();
+        $documento->alumno_id = $alumno->id;
+        $documento->plantilla_id = $plantilla->id;
+        $documento->ruta_archivo = $rutaArchivo;
+        $documento->hash_verificacion = md5_file($rutaCompleta);
+        $documento->fecha_generacion = date('Y-m-d H:i:s');
+        $documento->generado_por = Yii::$app->user->id;
+        $documento->version = 1;
+        $documento->estado = DocumentoGenerado::ESTADO_GENERADO;
+        
+        if (!$documento->save()) {
+            // Eliminar archivo si falla el guardado en BD
+            if (file_exists($rutaCompleta)) {
+                unlink($rutaCompleta);
+            }
+            throw new \Exception('Error al guardar documento: ' . json_encode($documento->errors));
+        }
+        
+        return $documento;
+    }
+
+   /**
+ * Valida requisitos específicos para cada tipo de documento
+ */
+private function validarRequisitos($tipo, $alumno)
+{
+    // Obtener requisitos específicos para este tipo de documento
+    $requisitosDocumento = \app\models\Requisito::getRequisitosPorTipo($tipo);
+    
+    $errores = [];
+    
+    foreach ($requisitosDocumento as $requisito) {
+        if ($requisito->obligatorio) {
+            $cumple = \app\models\AvanceAlumno::find()
+                ->where([
+                    'alumno_id' => $alumno->id,
+                    'requisito_id' => $requisito->id,
+                    'completado' => 1
+                ])
+                ->exists();
+            
+            if (!$cumple) {
+                $errores[] = $requisito->nombre;
+            }
+        }
+    }
+    
+    if (!empty($errores)) {
+        return 'Requisitos obligatorios pendientes: ' . implode(', ', $errores);
+    }
+
+    return null;
+}
+
+private function verificarRequisitoEspecifico($requisito, $alumno)
+{
+    // Lógica para verificar requisitos específicos
+    switch ($requisito->nombre) {
+        case 'Revisores asignados':
+            $countRevisores = \app\models\RevisorTesis::find()
+                ->where(['alumno_id' => $alumno->id])
+                ->count();
+            return $countRevisores === 4;
+            
+        case 'Tesis completada':
+            return !empty($alumno->titulo_tesis);
+            
+        case 'Dictamen de revisores':
+            // Aquí implementarías la lógica para verificar el dictamen
+            // Por ahora, asumimos que está aprobado si hay revisores asignados
+            $countRevisores = \app\models\RevisorTesis::find()
+                ->where(['alumno_id' => $alumno->id])
+                ->count();
+            return $countRevisores === 4;
+            
+        case 'Aprobación de sinodales':
+            // Similar al anterior
+            $countRevisores = \app\models\RevisorTesis::find()
+                ->where(['alumno_id' => $alumno->id])
+                ->count();
+            return $countRevisores === 4;
+            
+        default:
+            // Para requisitos genéricos, verificar en avancealumno
+            return \app\models\AvanceAlumno::find()
+                ->where([
+                    'alumno_id' => $alumno->id,
+                    'requisito_id' => $requisito->id,
+                    'completado' => 1
+                ])
+                ->exists();
+    }
+}
     /**
      * Configura mPDF con opciones optimizadas
      */
@@ -354,52 +398,47 @@ class DocumentoGeneradoController extends Controller
     }
 
     /**
-     * Genera número de oficio según el tipo de documento
+     * Genera número de oficio automático
      */
-    /**
- * Genera número de oficio automático
- * @param string $tipo Tipo de documento (LiberacionIngles, LiberacionTesis, etc.)
- * @return string Número de oficio formateado
- */
-public function generarNumeroOficio($tipo)
-{
-    $prefix = 'DEPI';
-    $year = date('Y');
-    $correlativo = DocumentoGenerado::find()
-        ->where(['YEAR(fecha_generacion)' => $year])
-        ->count() + 1;
+    public function generarNumeroOficio($tipo)
+    {
+        $prefix = 'DEPI';
+        $year = date('Y');
+        $correlativo = DocumentoGenerado::find()
+            ->where(['YEAR(fecha_generacion)' => $year])
+            ->count() + 1;
 
-    switch ($tipo) {
-        case 'LiberacionIngles': 
-            return sprintf("%s/%04d/%d", $prefix, 500 + $correlativo, $year);
-        case 'LiberacionTesis': 
-            return sprintf("%s/%04d/%d", $prefix, 600 + $correlativo, $year);
-        case 'Estancia': 
-            return sprintf("%s/%04d/%d", $prefix, 700 + $correlativo, $year);
-        default: 
-            return sprintf("%s/%04d/%d", $prefix, $correlativo, $year);
+        switch ($tipo) {
+            case 'LiberacionIngles': 
+                return sprintf("%s/%04d/%d", $prefix, 500 + $correlativo, $year);
+            case 'LiberacionTesis': 
+                return sprintf("%s/%04d/%d", $prefix, 600 + $correlativo, $year);
+            case 'Estancia': 
+                return sprintf("%s/%04d/%d", $prefix, 700 + $correlativo, $year);
+            default: 
+                return sprintf("%s/%04d/%d", $prefix, $correlativo, $year);
+        }
     }
-}
 
     /**
      * Muestra el PDF en el navegador
      */
- public function actionViewPdf($id)
-{
-    $documento = $this->findModel($id);
-    $filePath = Yii::getAlias('@webroot') . $documento->ruta_archivo;
-    
-    if (!file_exists($filePath)) {
-        throw new \yii\web\NotFoundHttpException('El archivo no existe');
-    }
+    public function actionViewPdf($id)
+    {
+        $documento = $this->findModel($id);
+        $filePath = Yii::getAlias('@webroot') . $documento->ruta_archivo;
+        
+        if (!file_exists($filePath)) {
+            throw new \yii\web\NotFoundHttpException('El archivo no existe');
+        }
 
-    return $this->renderPartial('@app/views/DocumentoGenerado/_pdf-viewer', [
-        'id' => $id
-    ]);
-}  
+        return $this->renderPartial('@app/views/DocumentoGenerado/_pdf-viewer', [
+            'id' => $id
+        ]);
+    }  
 
     /**
-     * Stream del PDF para descarga/visualización
+     * Stream del PDF para visualización en navegador
      */
     public function actionStream($id)
     {
@@ -410,10 +449,14 @@ public function generarNumeroOficio($tipo)
             throw new \yii\web\NotFoundHttpException('El archivo no existe');
         }
 
-        return Yii::$app->response->sendFile($filePath, null, [
-            'inline' => true,
-            'mimeType' => 'application/pdf'
-        ]);
+        // Configurar headers para visualización en el navegador
+        Yii::$app->response->format = \yii\web\Response::FORMAT_RAW;
+        Yii::$app->response->headers->set('Content-Type', 'application/pdf');
+        Yii::$app->response->headers->set('Content-Disposition', 'inline; filename="' . basename($filePath) . '"');
+        Yii::$app->response->headers->set('Content-Length', filesize($filePath));
+        Yii::$app->response->headers->set('Cache-Control', 'public, must-revalidate, max-age=0');
+        
+        return file_get_contents($filePath);
     }
 
     /**
@@ -429,7 +472,7 @@ public function generarNumeroOficio($tipo)
         }
 
         return Yii::$app->response->sendFile($filePath, basename($filePath), [
-            'inline' => false
+            'inline' => false // Forzar descarga
         ]);
     }
 
@@ -449,9 +492,9 @@ public function generarNumeroOficio($tipo)
             ->all();
 
         return $this->render('@app/views/DocumentoGenerado/historial', [
-        'alumno' => $alumno,
-        'documentos' => $documentos
-    ]);
+            'alumno' => $alumno,
+            'documentos' => $documentos
+        ]);
     }
 
     /**
@@ -465,4 +508,74 @@ public function generarNumeroOficio($tipo)
 
         throw new NotFoundHttpException(Yii::t('app', 'The requested page does not exist.'));
     }
+    public function actionDelete($id)
+{
+    // 1. Encontrar el registro del documento en la base de datos.
+    $model = $this->findModel($id);
+    // Guardamos el ID del alumno para poder redirigir de vuelta a su historial.
+    $alumnoId = $model->alumno_id;
+
+    // 2. Construir la ruta absoluta al archivo PDF en el servidor.
+    $filePath = Yii::getAlias('@webroot') . $model->ruta_archivo;
+
+    // 3. Borrar el archivo físico del servidor, solo si existe.
+    if (file_exists($filePath)) {
+        unlink($filePath);
+    }
+
+    // 4. Borrar el registro de la base de datos.
+    if ($model->delete()) {
+        Yii::$app->session->setFlash('success', 'El documento ha sido eliminado exitosamente.');
+    } else {
+        Yii::$app->session->setFlash('error', 'No se pudo eliminar el registro del documento de la base de datos.');
+    }
+
+    // 5. Redirigir de vuelta a la VISTA DEL HISTORIAL del alumno.
+    return $this->redirect(['ver-historia', 'alumno_id' => $alumnoId]);
+}
+/**
+ * Elimina múltiples documentos generados de forma masiva.
+ * @return \yii\web\Response
+ */
+public function actionBulkDelete()
+{
+    // Se espera que los datos lleguen por POST
+    $request = Yii::$app->request;
+    $alumnoId = $request->post('alumno_id');
+    $selection = $request->post('selection', []); // IDs de los documentos a borrar
+
+    if (empty($selection)) {
+        Yii::$app->session->setFlash('warning', 'No has seleccionado ningún documento para eliminar.');
+        return $this->redirect(['ver-historia', 'alumno_id' => $alumnoId]);
+    }
+
+    // Usamos una transacción para asegurar que todo se complete o nada se haga.
+    $transaction = Yii::$app->db->beginTransaction();
+    try {
+        // Encontramos todos los documentos que coinciden con los IDs seleccionados
+        $documentos = DocumentoGenerado::findAll(['id' => $selection]);
+        $archivosEliminados = 0;
+        
+        foreach ($documentos as $documento) {
+            $filePath = Yii::getAlias('@webroot') . $documento->ruta_archivo;
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+            $archivosEliminados++;
+        }
+
+        // Eliminamos todos los registros de la base de datos en una sola consulta
+        DocumentoGenerado::deleteAll(['id' => $selection]);
+
+        $transaction->commit();
+        Yii::$app->session->setFlash('success', "Se eliminaron $archivosEliminados documentos exitosamente.");
+
+    } catch (\Exception $e) {
+        $transaction->rollBack();
+        Yii::$app->session->setFlash('error', 'Ocurrió un error al intentar eliminar los documentos: ' . $e->getMessage());
+    }
+
+    // Redirigimos de vuelta al historial del alumno
+    return $this->redirect(['ver-historia', 'alumno_id' => $alumnoId]);
+}
 }

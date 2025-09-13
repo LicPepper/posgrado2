@@ -1,12 +1,15 @@
 <?php
 
-namespace app\models;
+namespace app\controllers;
 
+use Yii;
 use app\models\Requisito;
 use app\models\RequisitoSearch;
 use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\filters\VerbFilter;
+use yii\helpers\ArrayHelper; 
+use app\models\Programa;
 
 /**
  * RequisitoController implements the CRUD actions for Requisito model.
@@ -17,35 +20,52 @@ class RequisitoController extends Controller
      * @inheritDoc
      */
     public function behaviors()
-    {
-        return array_merge(
-            parent::behaviors(),
-            [
-                'verbs' => [
-                    'class' => VerbFilter::className(),
-                    'actions' => [
-                        'delete' => ['POST'],
+{
+    return array_merge(
+        parent::behaviors(),
+        [
+            'verbs' => [
+                'class' => VerbFilter::className(),
+                'actions' => [
+                    'delete' => ['POST'],
+                ],
+            ],
+            'access' => [
+                'class' => \yii\filters\AccessControl::className(),
+                'rules' => [
+                    [
+                        'allow' => true,
+                        'roles' => ['@'], // Solo usuarios autenticados
                     ],
                 ],
-            ]
-        );
-    }
+            ],
+        ]
+    );
+}
 
     /**
      * Lists all Requisito models.
      *
+     * @param string|null $tipo Filtro por tipo de documento
      * @return string
      */
-    public function actionIndex()
-    {
-        $searchModel = new RequisitoSearch();
-        $dataProvider = $searchModel->search($this->request->queryParams);
-
-        return $this->render('index', [
-            'searchModel' => $searchModel,
-            'dataProvider' => $dataProvider,
-        ]);
+    public function actionIndex($tipo = null)
+{
+    $searchModel = new RequisitoSearch();
+    $dataProvider = $searchModel->search($this->request->queryParams);
+    
+    // Filtrar por tipo de documento si se especificó
+    if ($tipo) {
+        $dataProvider->query->andWhere(['tipo_documento' => $tipo]);
+        $searchModel->tipo_documento = $tipo;
     }
+
+    return $this->render('index', [
+        'searchModel' => $searchModel,
+        'dataProvider' => $dataProvider,
+        'tipoDocumento' => $tipo,
+    ]);
+}
 
     /**
      * Displays a single Requisito model.
@@ -63,44 +83,54 @@ class RequisitoController extends Controller
     /**
      * Creates a new Requisito model.
      * If creation is successful, the browser will be redirected to the 'view' page.
+     * @param string|null $tipo_documento Tipo de documento pre-seleccionado
      * @return string|\yii\web\Response
      */
-    public function actionCreate()
-    {
-        $model = new Requisito();
-
-        if ($this->request->isPost) {
-            if ($model->load($this->request->post()) && $model->save()) {
-                return $this->redirect(['view', 'id' => $model->id]);
-            }
-        } else {
-            $model->loadDefaultValues();
-        }
-
-        return $this->render('create', [
-            'model' => $model,
-        ]);
+    public function actionCreate($tipo_documento = null)
+{
+    $model = new Requisito();
+    
+    if ($tipo_documento) {
+        $model->tipo_documento = $tipo_documento;
     }
 
-    /**
-     * Updates an existing Requisito model.
-     * If update is successful, the browser will be redirected to the 'view' page.
-     * @param int $id ID
-     * @return string|\yii\web\Response
-     * @throws NotFoundHttpException if the model cannot be found
-     */
-    public function actionUpdate($id)
-    {
-        $model = $this->findModel($id);
-
-        if ($this->request->isPost && $model->load($this->request->post()) && $model->save()) {
+    if ($this->request->isPost) {
+        if ($model->load($this->request->post()) && $model->save()) {
+            Yii::$app->session->setFlash('success', 'Requisito creado exitosamente.');
             return $this->redirect(['view', 'id' => $model->id]);
         }
-
-        return $this->render('update', [
-            'model' => $model,
-        ]);
+    } else {
+        $model->loadDefaultValues();
     }
+
+    $tiposDocumentos = Requisito::getTiposDocumentos();
+    $programas = ArrayHelper::map(Programa::find()->all(), 'id', 'nombre');
+
+    return $this->render('create', [
+        'model' => $model,
+        'tiposDocumentos' => $tiposDocumentos,
+        'programas' => $programas
+    ]);
+}
+
+public function actionUpdate($id)
+{
+    $model = $this->findModel($id);
+
+    if ($this->request->isPost && $model->load($this->request->post()) && $model->save()) {
+        Yii::$app->session->setFlash('success', 'Requisito actualizado exitosamente.');
+        return $this->redirect(['view', 'id' => $model->id]);
+    }
+
+    $tiposDocumentos = Requisito::getTiposDocumentos();
+    $programas = ArrayHelper::map(Programa::find()->all(), 'id', 'nombre');
+
+    return $this->render('update', [
+        'model' => $model,
+        'tiposDocumentos' => $tiposDocumentos,
+        'programas' => $programas
+    ]);
+}
 
     /**
      * Deletes an existing Requisito model.
@@ -118,7 +148,7 @@ class RequisitoController extends Controller
 
     /**
      * Finds the Requisito model based on its primary key value.
-     * If the model is not found, a 404 HTTP exception will be thrown.
+     * If the model is not found, a 404 exception will be thrown.
      * @param int $id ID
      * @return Requisito the loaded model
      * @throws NotFoundHttpException if the model cannot be found
@@ -129,6 +159,10 @@ class RequisitoController extends Controller
             return $model;
         }
 
-        throw new NotFoundHttpException(Yii::t('app', 'The requested page does not exist.'));
+        throw new NotFoundHttpException('The requested page does not exist.');
     }
+    /**
+ * Vista de administración por tipo de documento
+ */
+
 }

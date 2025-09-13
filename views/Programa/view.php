@@ -6,34 +6,47 @@ use yii\widgets\DetailView;
 /** @var yii\web\View $this */
 /** @var app\models\Programa $model */
 
-$this->title = $model->id;
+$this->title = $model->nombre;
 $this->params['breadcrumbs'][] = ['label' => Yii::t('app', 'Programas'), 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
+
+// Obtener usuario actual y sus permisos
+$user = Yii::$app->user->identity;
+$puedeEditar = $user && $user->puede('editar');
+
 \yii\web\YiiAsset::register($this);
 ?>
 <div class="programa-view">
 
-    <h1><?= Html::encode($this->title) ?></h1>
-
-    <p>
-        <?= Html::a(Yii::t('app', 'Update'), ['update', 'id' => $model->id], ['class' => 'btn btn-primary']) ?>
-        <?= Html::a(Yii::t('app', 'Delete'), ['delete', 'id' => $model->id], [
-            'class' => 'btn btn-danger',
-            'data' => [
-                'confirm' => Yii::t('app', 'Are you sure you want to delete this item?'),
-                'method' => 'post',
-            ],
-        ]) ?>
-    </p>
-
-    <?= DetailView::widget([
-        'model' => $model,
-        'attributes' => [
-            'id',
-            'nombre',
-            'nivel',
-            'descripcion:ntext',
-        ],
-    ]) ?>
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title">Detalles del Programa</h3>
+            <div class="float-right">
+                <?= Html::a('<i class="fas fa-edit"></i> Editar', ['update', 'id' => $model->id], ['class' => 'btn btn-light btn-sm']) ?>
+                <?= Html::a('<i class="fas fa-list"></i> Volver', ['index'], ['class' => 'btn btn-light btn-sm']) ?>
+            </div>
+        </div>
+        <div class="card-body">
+            <?= DetailView::widget([
+                'model' => $model,
+                'attributes' => [
+                    'nombre',
+                    [
+                        'attribute' => 'nivel',
+                        'value' => function($model) {
+                            return $model->displayNivel();
+                        }
+                    ],
+                    [
+                        'attribute' => 'descripcion',
+                        'format' => 'ntext',
+                        'value' => function($model) {
+                            return $model->descripcion ? $model->descripcion : 'Sin descripción';
+                        }
+                    ],
+                ],
+            ]) ?>
+        </div>
+    </div>
 
 </div>
