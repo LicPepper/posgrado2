@@ -94,9 +94,12 @@ class Requisito extends \yii\db\ActiveRecord
         return [
             'LiberacionIngles' => 'Liberación de Inglés',
             'LiberacionTesis' => 'Liberación de Tesis',
-            'Estancia' => 'Carta de Estancia',
-            'Constancia' => 'Constancia General',
-            'Kardex' => 'Kardex',
+            'AutorizacionActoRecepcion' => 'Autorización de Acto de Recepción',
+            'AutorizacionExamen' => 'Autorización de Examen',
+            'AutorizacionImpresion' => 'Autorización de Impresión',
+            'ConstanciaDictamen' => 'Constancia de Dictamen',
+            'ProtocoloExamen' => 'Protocolo de Examen Profesional'
+        // Agregar más tipos según sea necesario
             
         ];
     }

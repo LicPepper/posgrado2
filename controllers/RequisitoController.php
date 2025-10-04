@@ -86,7 +86,8 @@ class RequisitoController extends Controller
      * @param string|null $tipo_documento Tipo de documento pre-seleccionado
      * @return string|\yii\web\Response
      */
-    public function actionCreate($tipo_documento = null)
+    
+public function actionCreate($tipo_documento = null)
 {
     $model = new Requisito();
     

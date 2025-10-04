@@ -1,4 +1,3 @@
-
 <?php
 /** @var yii\web\View $this */
 /** @var string $content */
@@ -26,6 +25,9 @@ $this->registerLinkTag([
 // Registro de recursos CSS
 $this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 $this->registerCssFile('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Nunito:wght@600;700&display=swap');
+
+// SweetAlert2 para alertas bonitas
+$this->registerCssFile('https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css');
 
 // CSS personalizado
 $this->registerCss(<<<CSS
@@ -102,7 +104,6 @@ CSS
             'label' => '<i class="fas fa-users"></i> Alumnos',
             'items' => [
                 ['label' => '<i class="fas fa-list"></i> Listado', 'url' => ['/alumno/index']],
-                ['label' => '<i class="fas fa-search"></i> Buscar', 'url' => ['/alumno/buscar']],
                 '<div class="dropdown-divider"></div>',
                 ['label' => '<i class="fas fa-plus"></i> Nuevo alumno', 'url' => ['/alumno/create']],
             ],
@@ -123,8 +124,7 @@ CSS
         [
             'label' => '<i class="fas fa-list-check"></i> Requisitos',
             'items' => [
-                ['label' => '<i class="fas fa-list"></i> Ver Todos', 'url' => ['/requisito/index']],
-                ['label' => '<i class="fas fa-cog"></i> Administrar por Documento', 'url' => ['/requisito/admin']],
+                ['label' => '<i class="fas fa-list"></i> Listado', 'url' => ['/requisito/index']],              
                 '<div class="dropdown-divider"></div>',
                 ['label' => '<i class="fas fa-plus"></i> Crear Nuevo', 'url' => ['/requisito/create']],
             ],
@@ -158,6 +158,12 @@ CSS
                     'url' => ['/usuario/update', 'id' => Yii::$app->user->id],
                     'linkOptions' => ['class' => 'dropdown-item']
                 ],
+                // Opción de crear usuario solo para administradores
+                (Yii::$app->user->identity->puede('crear') ? [
+                    'label' => '<i class="fas fa-user-plus"></i> Crear usuario',
+                    'url' => ['/usuario/create'],
+                    'linkOptions' => ['class' => 'dropdown-item']
+                ] : ''),
                 '<div class="dropdown-divider"></div>',
                 Html::beginForm(['/site/logout'], 'post', ['class' => 'd-inline'])
                 . Html::submitButton(
@@ -223,8 +229,10 @@ CSS
     </div>
 </footer>
 
+<!-- SweetAlert2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+
 <?php $this->endBody() ?>
 </body>
 </html>
 <?php $this->endPage() ?>
-[file content end]

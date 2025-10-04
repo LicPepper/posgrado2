@@ -1,14 +1,12 @@
 <?php
 use yii\helpers\Html;
-/* 
- * Variables disponibles:
- * - $alumno: Datos del alumno
- * - $revisores: Lista de revisores asignados
- * - $tituloTesis: Título de la tesis
- * - $numeroOficio: Número de oficio generado
- */
 ?>
-<div style="font-family: 'Times New Roman'; margin: 2cm; line-height: 1.5;">
+
+<div class="texto-documento">
+    <!-- Espacio superior de 4cm -->
+    <div style="height: 4cm;"></div>
+
+    <!-- CONTENIDO ESPECÍFICO -->
     <p style="text-align: right;">Villahermosa, Tabasco, <?= date('d/m/Y') ?></p>
     <p style="text-align: center;"><strong>NO. DE OFICIO: <?= Html::encode($numeroOficio) ?></strong></p>
     <p style="text-align: center;"><strong>ASUNTO: Nombramiento como revisor de tesis</strong></p>

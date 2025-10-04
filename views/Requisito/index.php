@@ -17,7 +17,6 @@ $tiposDocumentos = Requisito::getTiposDocumentos();
             <h3 class="card-title mb-0"><?= Html::encode($this->title) ?></h3>
             <div class="float-right">
                 <?= Html::a('<i class="fas fa-plus"></i> Nuevo Requisito', ['create'], ['class' => 'btn btn-light btn-sm']) ?>
-                <!-- ELIMINADO: Botón Administrar por Documento -->
             </div>
         </div>
         
@@ -46,9 +45,14 @@ $tiposDocumentos = Requisito::getTiposDocumentos();
                 'layout' => "{items}\n{pager}\n{summary}",
                 'tableOptions' => ['class' => 'table table-striped table-bordered'],
                 'columns' => [
-                    // ELIMINADO: ['class' => 'yii\grid\SerialColumn'],
-                    
-                    // ELIMINADO: Todo el bloque de tipo_documento
+                    [
+                        'attribute' => 'tipo_documento',
+                        'value' => function($model) use ($tiposDocumentos) {
+                            return isset($tiposDocumentos[$model->tipo_documento]) ? 
+                                $tiposDocumentos[$model->tipo_documento] : $model->tipo_documento;
+                        },
+                        'filter' => $tiposDocumentos,
+                    ],
                     
                     [
                         'attribute' => 'programa_id',

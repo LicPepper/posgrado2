@@ -79,9 +79,9 @@ class DocumentoGeneradoController extends Controller
         ]);
     }
 
-    /**
-     * Acción principal para generar documentos PDF
-     */
+    /***********************************************
+     * Acción principal para generar documentos PDF*
+     ***********************************************/
     public function actionGenerar()
     {
         Yii::info("Iniciando generación de documento", 'app');
@@ -93,6 +93,7 @@ class DocumentoGeneradoController extends Controller
             $tipoDocumento = $request->post('tipo_documento');
             
             Yii::info("Datos recibidos - alumnoId: $alumnoId, tipoDocumento: $tipoDocumento", 'app');
+            Yii::info("Todos los POST: " . json_encode($_POST), 'app');
 
             // Validaciones básicas
             if (empty($alumnoId)) {
@@ -180,55 +181,139 @@ class DocumentoGeneradoController extends Controller
             ];
         }
     }
-
-    /**
-     * Busca plantilla por tipo de documento
-     */
+    /****************************************
+     * Busca plantilla por tipo de documento*
+     ****************************************/
     private function buscarPlantilla($tipoDocumento, $mapeoTipos, $alumno)
-    {
-        if (isset($mapeoTipos[$tipoDocumento])) {
-            foreach ($mapeoTipos[$tipoDocumento] as $variacion) {
-                $plantilla = PlantillaDocumento::find()
-                    ->where(['tipo' => $variacion])
-                    ->andWhere(['OR', 
-                        ['programa_id' => $alumno->programa_id],
-                        ['programa_id' => null]
-                    ])
-                    ->one();
-                if ($plantilla) return $plantilla;
-            }
-        }
-        return null;
+{
+    Yii::info("=== BUSCANDO PLANTILLA ===", 'app');
+    Yii::info("Tipo documento: $tipoDocumento", 'app');
+    Yii::info("Programa alumno: " . $alumno->programa_id, 'app');
+
+    // Buscar directamente por el tipo (ahora que el ENUM está actualizado)
+    $plantilla = PlantillaDocumento::find()
+        ->where(['tipo' => $tipoDocumento])
+        ->andWhere(['OR', 
+            ['programa_id' => $alumno->programa_id],
+            ['programa_id' => null]
+        ])
+        ->andWhere(['activo' => 1])
+        ->one();
+
+    if ($plantilla) {
+        Yii::info("✓ Plantilla ENCONTRADA: ID {$plantilla->id} - {$plantilla->nombre} - {$plantilla->tipo}", 'app');
+        return $plantilla;
     }
+
+    Yii::error("✗ No se encontró plantilla para tipo: $tipoDocumento", 'app');
+    
+    // Log adicional para debug: mostrar todas las plantillas disponibles
+    $todasPlantillas = PlantillaDocumento::find()
+        ->select(['id', 'nombre', 'tipo', 'programa_id'])
+        ->where(['activo' => 1])
+        ->asArray()
+        ->all();
+    
+    Yii::info("Plantillas disponibles: " . json_encode($todasPlantillas), 'app');
+    
+    return null;
+}
 
     /**
      * Obtiene la vista según el tipo de documento
      */
     private function obtenerVistaPorTipo($tipoDocumento, $request, $alumno, &$params)
-    {
-        switch ($tipoDocumento) {
-            case 'LiberacionIngles':
-                $params['articulo'] = $request->post('articulo', 'Artículo de investigación en inglés');
-                return '_liberacion-ingles';
-                
-            case 'Estancia':
-                $params['fechaInicio'] = $request->post('fecha_inicio', date('d/m/Y'));
-                $params['fechaFin'] = $request->post('fecha_fin', date('d/m/Y', strtotime('+1 month')));
-                $params['asesor'] = $request->post('asesor', 'MCIB. Juana Selvan García');
-                $params['proyecto'] = $request->post('proyecto', 'Tesis de '.$alumno->programa->nombre);
-                return '_estancia';
-                
-            case 'Constancia':
-                return '_constancia';
-                
-            case 'LiberacionTesis':
-                return '_liberaciontesis';
-                
-            default:
-                throw new \Exception('Tipo de documento no válido');
-        }
+{
+    Yii::info("Obteniendo vista para tipo: " . $tipoDocumento, 'app');
+    
+    // Documentos que requieren título de tesis
+    $documentosConTesis = [
+        'LiberacionTesis', 
+        'AutorizacionImpresion',
+        'AutorizacionActoRecepcion', 
+        'ConstanciaDictamen',
+        'AutorizacionExamen',
+        'ProtocoloExamen'
+    ];
+    
+    if (in_array($tipoDocumento, $documentosConTesis)) {
+        $params['tituloTesis'] = $request->post('titulo_tesis', $alumno->titulo_tesis);
+        Yii::info("Título de tesis: " . $params['tituloTesis'], 'app');
     }
-
+    
+    $vista = '';
+    
+    switch ($tipoDocumento) {
+        case 'LiberacionIngles':
+            $params['articulo'] = $request->post('articulo', 'Artículo de investigación en inglés');
+            $vista = '_liberacion-ingles';
+            break;
+            
+        case 'LiberacionTesis':
+            $params['lgac'] = $request->post('lgac_tesis', 'Calidad y Sustentabilidad en las Organizaciones');
+            $params['porcentajeCoincidencia'] = $request->post('porcentaje_coincidencia', '10');
+            $params['jefeDivision'] = 'Francisco López Villarreal';
+            $params['coordinadorMaestria'] = 'Coordinador de la Maestría';
+            $vista = '_liberacion-tesis';
+            break;
+            
+        case 'AutorizacionImpresion':
+            $revisores = [];
+            $revisoresAsignados = $alumno->revisores;
+            foreach ($revisoresAsignados as $revisor) {
+                $revisores[] = $revisor->nombre;
+            }
+            $params['revisores'] = $revisores;
+            $params['jefeDivision'] = 'Francisco López Villarreal';
+            $vista = '_autorizacion-impresion';
+            break;
+            
+        case 'AutorizacionActoRecepcion':
+            $params['tipoRevisor'] = $request->post('tipo_revisor', 'PRESIDENTE');
+            $params['fechaActo'] = $request->post('fecha_acto', date('Y-m-d'));
+            $params['horaActo'] = $request->post('hora_acto', '10:00');
+            $revisores = $alumno->revisores;
+            $params['revisor'] = !empty($revisores) ? $revisores[0] : (object)['nombre' => 'REVISOR NO ASIGNADO'];
+            $vista = '_autorizacion-acto-recepcion';
+            break;
+            
+        case 'ConstanciaDictamen':
+            $revisores = [];
+            $revisoresAsignados = $alumno->revisores;
+            foreach ($revisoresAsignados as $revisor) {
+                $revisores[] = $revisor->nombre;
+            }
+            $params['revisores'] = $revisores;
+            $params['lgac'] = $request->post('lgac_tesis', 'Calidad y Sustentabilidad en las Organizaciones');
+            $params['jefeDivision'] = 'Francisco López Villarreal';
+            $params['coordinadorMaestria'] = 'Coordinador de la Maestría';
+            $vista = '_constancia-dictamen';
+            break;
+            
+        case 'AutorizacionExamen':
+            $params['fechaExamen'] = $request->post('fecha_examen', date('Y-m-d'));
+            $params['horaExamen'] = $request->post('hora_examen', '10:00');
+            $vista = '_autorizacion-examen';
+            break;
+            
+        case 'ProtocoloExamen':
+            $params['fechaExamen'] = $request->post('fecha_examen', date('Y-m-d'));
+            $params['horaExamen'] = $request->post('hora_examen', '10:00');
+            $params['presidente'] = $request->post('presidente', '');
+            $params['secretario'] = $request->post('secretario', '');
+            $params['vocal'] = $request->post('vocal', '');
+            $params['vocalSuplente'] = $request->post('vocal_suplente', '');
+            $vista = '_protocolo-examen';
+            break;
+            
+        default:
+            Yii::error("Tipo de documento no válido: " . $tipoDocumento, 'app');
+            throw new \Exception('Tipo de documento no válido: ' . $tipoDocumento);
+    }
+    
+    Yii::info("Vista seleccionada: " . $vista, 'app');
+    return $vista;
+}
     /**
      * Guarda documento en base de datos
      */
@@ -258,6 +343,9 @@ class DocumentoGeneradoController extends Controller
    /**
  * Valida requisitos específicos para cada tipo de documento
  */
+/**
+ * Valida requisitos específicos para cada tipo de documento
+ */
 private function validarRequisitos($tipo, $alumno)
 {
     // Obtener requisitos específicos para este tipo de documento
@@ -267,13 +355,7 @@ private function validarRequisitos($tipo, $alumno)
     
     foreach ($requisitosDocumento as $requisito) {
         if ($requisito->obligatorio) {
-            $cumple = \app\models\AvanceAlumno::find()
-                ->where([
-                    'alumno_id' => $alumno->id,
-                    'requisito_id' => $requisito->id,
-                    'completado' => 1
-                ])
-                ->exists();
+            $cumple = $this->verificarRequisitoEspecifico($requisito, $alumno);
             
             if (!$cumple) {
                 $errores[] = $requisito->nombre;
@@ -282,7 +364,7 @@ private function validarRequisitos($tipo, $alumno)
     }
     
     if (!empty($errores)) {
-        return 'Requisitos obligatorios pendientes: ' . implode(', ', $errores);
+        return 'Requisitos obligatorios pendientes: <br>- ' . implode('<br>- ', $errores);
     }
 
     return null;
@@ -302,7 +384,7 @@ private function verificarRequisitoEspecifico($requisito, $alumno)
             return !empty($alumno->titulo_tesis);
             
         case 'Dictamen de revisores':
-            // Aquí implementarías la lógica para verificar el dictamen
+            // Aquí se implementa la lógica para verificar el dictamen
             // Por ahora, asumimos que está aprobado si hay revisores asignados
             $countRevisores = \app\models\RevisorTesis::find()
                 ->where(['alumno_id' => $alumno->id])
@@ -330,41 +412,52 @@ private function verificarRequisitoEspecifico($requisito, $alumno)
     /**
      * Configura mPDF con opciones optimizadas
      */
-    private function configurarMPdf()
-    {
-        $defaultConfig = (new ConfigVariables())->getDefaults();
-        $fontDirs = $defaultConfig['fontDir'];
+    // En DocumentoGeneradoController.php - método configurarMPdf
+private function configurarMPdf()
+{
+    $defaultConfig = (new ConfigVariables())->getDefaults();
+    $fontDirs = $defaultConfig['fontDir'];
 
-        $defaultFontConfig = (new FontVariables())->getDefaults();
-        $fontData = $defaultFontConfig['fontdata'];
+    $defaultFontConfig = (new FontVariables())->getDefaults();
+    $fontData = $defaultFontConfig['fontdata'];
 
-        return new Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'margin_left' => 15,
-            'margin_right' => 15,
-            'margin_top' => 25,
-            'margin_bottom' => 20,
-            'margin_header' => 10,
-            'margin_footer' => 10,
-            'tempDir' => Yii::getAlias('@runtime/mpdf'),
-            'fontDir' => array_merge($fontDirs, [
-                Yii::getAlias('@webroot/fonts'),
-            ]),
-            'fontdata' => $fontData + [
-                'arial' => [
-                    'R' => 'arial.ttf',
-                    'B' => 'arialbd.ttf',
-                ],
-                'times' => [
-                    'R' => 'times.ttf',
-                    'B' => 'timesbd.ttf',
-                ],
+    $mpdf = new Mpdf([
+        'mode' => 'utf-8',
+        'format' => 'A4',
+        'margin_left' => 15,
+        'margin_right' => 15,
+        'margin_top' => 25,
+        'margin_bottom' => 20,
+        'margin_header' => 10,
+        'margin_footer' => 10,
+        'tempDir' => Yii::getAlias('@runtime/mpdf'),
+        'fontDir' => array_merge($fontDirs, [
+            Yii::getAlias('@webroot/fonts'),
+        ]),
+        'fontdata' => $fontData + [
+            'arial' => [
+                'R' => 'arial.ttf',
+                'B' => 'arialbd.ttf',
             ],
-            'default_font' => 'arial',
-            'orientation' => 'P',
-        ]);
+            'times' => [
+                'R' => 'times.ttf',
+                'B' => 'timesbd.ttf',
+            ],
+        ],
+        'default_font' => 'times',
+        'orientation' => 'P',
+    ]);
+
+    // Agregar imagen de fondo a TODOS los documentos
+    $fondoPath = Yii::getAlias('@webroot/img/fondo.jpg');
+    if (file_exists($fondoPath)) {
+        $mpdf->SetDefaultBodyCSS('background', "url('$fondoPath') no-repeat center center");
+        $mpdf->SetDefaultBodyCSS('background-size', 'cover');
+        $mpdf->SetDefaultBodyCSS('background-image-resize', 6);
     }
+
+    return $mpdf;
+}
 
     /**
      * Verifica y crea los directorios necesarios
@@ -400,26 +493,29 @@ private function verificarRequisitoEspecifico($requisito, $alumno)
     /**
      * Genera número de oficio automático
      */
-    public function generarNumeroOficio($tipo)
-    {
-        $prefix = 'DEPI';
-        $year = date('Y');
-        $correlativo = DocumentoGenerado::find()
-            ->where(['YEAR(fecha_generacion)' => $year])
-            ->count() + 1;
+    private function generarNumeroOficio($tipo)
+{
+    $prefix = 'DEPI';
+    $year = date('Y');
+    $correlativo = DocumentoGenerado::find()->where(['YEAR(fecha_generacion)' => $year])->count() + 1;
 
-        switch ($tipo) {
-            case 'LiberacionIngles': 
-                return sprintf("%s/%04d/%d", $prefix, 500 + $correlativo, $year);
-            case 'LiberacionTesis': 
-                return sprintf("%s/%04d/%d", $prefix, 600 + $correlativo, $year);
-            case 'Estancia': 
-                return sprintf("%s/%04d/%d", $prefix, 700 + $correlativo, $year);
-            default: 
-                return sprintf("%s/%04d/%d", $prefix, $correlativo, $year);
-        }
+    $offset = 0;
+    switch ($tipo) {
+        case 'Asignación Revisor Individual': $offset = 100; break;
+        case 'Asignación Revisores': $offset = 500; break;
+        case 'LiberacionIngles': $offset = 500; break;
+        case 'LiberacionTesis': $offset = 600; break;
+        case 'Estancia': $offset = 700; break;
+        // Agregar offsets para los nuevos tipos
+        case 'AutorizacionImpresion': $offset = 800; break;
+        case 'AutorizacionActoRecepcion': $offset = 900; break;
+        case 'ConstanciaDictamen': $offset = 1000; break;
+        case 'AutorizacionExamen': $offset = 1100; break;
+        case 'ProtocoloExamen': $offset = 1200; break;
     }
 
+    return sprintf("%s/%04d/%d", $prefix, $offset + $correlativo, $year);
+}
     /**
      * Muestra el PDF en el navegador
      */

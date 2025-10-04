@@ -8,6 +8,47 @@ use yii\helpers\Url;
 /** @var yii\web\View $this */
 /** @var app\models\Alumno $model */
 /** @var bool $puedeGenerar */
+
+// Obtener el título de tesis para usar en JavaScript
+$tituloTesis = !empty($model->titulo_tesis) ? $model->titulo_tesis : '';
+
+// Verificar requisitos para cada tipo de documento
+$requisitosPorTipo = [];
+$tiposDocumentos = \app\models\Requisito::getTiposDocumentos();
+
+foreach ($tiposDocumentos as $tipoKey => $tipoNombre) {
+    $requisitos = \app\models\Requisito::getRequisitosPorTipo($tipoKey);
+    $requisitosPorTipo[$tipoKey] = [
+        'nombre' => $tipoNombre,
+        'cumplido' => true // Asumimos que se cumplen inicialmente
+    ];
+    
+    foreach ($requisitos as $requisito) {
+        if ($requisito->obligatorio) {
+            $avance = \app\models\AvanceAlumno::find()
+                ->where([
+                    'alumno_id' => $model->id,
+                    'requisito_id' => $requisito->id,
+                    'completado' => 1
+                ])
+                ->exists();
+            
+            if (!$avance) {
+                $requisitosPorTipo[$tipoKey]['cumplido'] = false;
+                break; // No need to check further if one is missing
+            }
+        }
+    }
+}
+
+// Filtrar solo los documentos disponibles
+$documentosDisponibles = array_filter($requisitosPorTipo, function($doc) {
+    return $doc['cumplido'];
+});
+
+// Convertir a JSON para usar en JavaScript
+$requisitosJson = json_encode($requisitosPorTipo);
+$documentosDisponiblesJson = json_encode(array_keys($documentosDisponibles));
 ?>
 
 <div class="alumno-view">
@@ -50,14 +91,19 @@ use yii\helpers\Url;
                     </h3>
                 </div>
                 <div class="card-body">
-                    <?php
-                    $tiposDocumentos = \app\models\Requisito::getTiposDocumentos();
-                    foreach ($tiposDocumentos as $tipoKey => $tipoNombre): 
+                    <?php foreach ($requisitosPorTipo as $tipoKey => $info): 
                         $requisitos = \app\models\Requisito::getRequisitosPorTipo($tipoKey);
                         if (!empty($requisitos)):
                     ?>
                     <div class="mb-3">
-                        <h5><?= $tipoNombre ?></h5>
+                        <h5>
+                            <?= $info['nombre'] ?>
+                            <?php if ($info['cumplido']): ?>
+                                <span class="badge bg-success float-end">Disponible</span>
+                            <?php else: ?>
+                                <span class="badge bg-warning float-end">Pendiente</span>
+                            <?php endif; ?>
+                        </h5>
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered">
                                 <thead>
@@ -166,12 +212,11 @@ use yii\helpers\Url;
                         ['class' => 'btn btn-info w-100 mb-3']
                     ) ?>
 
-
                     <!-- Botón para generar documentos (existente) -->
                     <button class="btn btn-primary w-100 mb-3" 
                             data-bs-toggle="modal" 
                             data-bs-target="#generarDocumentoModal"
-                            <?= !$puedeGenerar ? 'disabled' : '' ?>>
+                            id="btn-generar-documento">
                         <i class="fas fa-file-pdf"></i> Generar Documento
                     </button>
 
@@ -195,21 +240,6 @@ use yii\helpers\Url;
                 </div>
             </div>
 
-
-
-<?= Html::a(
-    '<i class="fas fa-file-certificate"></i> Generar Constancia',
-    ['generar-constancia', 'id' => $model->id],
-    [
-        'class' => 'btn btn-success w-100 mb-3',
-        'data' => [
-            'confirm' => '¿Generar constancia para ' . $model->nombre . '?',
-            'method' => 'post',
-        ]
-    ]
-) ?>
-
-
             <!-- Información de revisores -->
             <div class="card mt-4">
                 <div class="card-header bg-info text-white">
@@ -222,8 +252,8 @@ use yii\helpers\Url;
                             <li>Se requieren exactamente 4 revisores por alumno</li>
                             <li>Los documentos generados son:
                                 <ul>
-                                    <li><strong>001:</strong> Cartas individuales para cada revisor</li>
-                                    <li><strong>002:</strong> Notificación de asignación al alumno</li>
+                                    <li><strong>*</strong> Cartas individuales para cada revisor</li>
+                                    <li><strong>*</strong> Notificación de asignación al alumno</li>
                                 </ul>
                             </li>
                         </ul>
@@ -243,6 +273,7 @@ use yii\helpers\Url;
                             <li>Los requisitos se validan por tipo de documento</li>
                             <li>Use "Validar Requisitos" para marcar cumplimiento</li>
                             <li>Los documentos solo se generan si todos los requisitos están cumplidos</li>
+                            <li>El botón "Generar Documento" estará disponible cuando al menos un tipo de documento tenga todos sus requisitos cumplidos</li>
                         </ul>
                     </div>
                 </div>
@@ -271,35 +302,10 @@ use yii\helpers\Url;
         <label for="tipo-documento">Tipo de Documento</label>
         <select class="form-control" id="tipo-documento" name="tipo_documento" required>
             <option value="">Seleccionar tipo de documento</option>
-            <?php
-            $tiposDocumentos = \app\models\Requisito::getTiposDocumentos();
-            foreach ($tiposDocumentos as $tipoKey => $tipoNombre): 
-                // Verificar si el alumno cumple con los requisitos de este tipo
-                $requisitos = \app\models\Requisito::getRequisitosPorTipo($tipoKey);
-                $todosCumplidos = true;
-                
-                foreach ($requisitos as $requisito) {
-                    $cumplido = \app\models\AvanceAlumno::find()
-                        ->where([
-                            'alumno_id' => $model->id,
-                            'requisito_id' => $requisito->id,
-                            'completado' => 1
-                        ])
-                        ->exists();
-                    
-                    if (!$cumplido) {
-                        $todosCumplidos = false;
-                        break;
-                    }
-                }
-            ?>
-            <option value="<?= $tipoKey ?>" <?= $todosCumplidos ? '' : 'disabled' ?>>
-                <?= $tipoNombre ?> <?= $todosCumplidos ? '' : '(Faltan requisitos)' ?>
-            </option>
-            <?php endforeach; ?>
+            <!-- Las opciones se llenarán dinámicamente con JavaScript -->
         </select>
         <small class="form-text text-muted">
-            Solo se muestran los documentos para los que el alumno cumple con todos los requisitos
+            Seleccione el tipo de documento a generar
         </small>
     </div>
 
@@ -307,8 +313,13 @@ use yii\helpers\Url;
         <!-- Los campos dinámicos se cargarán aquí mediante JavaScript -->
     </div>
 
+    <div id="sin-documentos-alerta" class="alert alert-info" style="display: none;">
+        <i class="fas fa-info-circle"></i> 
+        <span>No hay documentos disponibles para generar. Complete los requisitos necesarios.</span>
+    </div>
+
     <div class="form-group mt-3">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" id="btn-generar-submit" disabled>
             <i class="fas fa-file-pdf"></i> Generar Documento
         </button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -322,285 +333,403 @@ use yii\helpers\Url;
 <?php Modal::end() ?>
 
 <?php
-$urlGenerarPdf = Url::to(['alumno/generar-pdf']);
 $js = <<<JS
-// Función principal para generar documentos
-function generarDocumentosRevisores(alumnoId) {
-    console.log('Iniciando generación de documentos para alumno:', alumnoId);
+// Datos de requisitos por tipo de documento
+var requisitosPorTipo = $requisitosJson;
+var documentosDisponibles = $documentosDisponiblesJson;
+
+// Función para verificar si un tipo de documento tiene todos los requisitos cumplidos
+function documentoDisponible(tipo) {
+    return requisitosPorTipo[tipo] && requisitosPorTipo[tipo].cumplido;
+}
+
+// Función para llenar el dropdown con solo los documentos disponibles
+function llenarDropdownDocumentos() {
+    var dropdown = $('#tipo-documento');
+    dropdown.empty().append('<option value="">Seleccionar tipo de documento</option>');
     
-    if (!confirm('¿Generar documentos de revisores para este alumno?')) {
+    var tieneDocumentos = false;
+    
+    // Documentos principales
+    if (documentoDisponible('LiberacionIngles')) {
+        dropdown.append('<option value="LiberacionIngles">Liberación de Inglés</option>');
+        tieneDocumentos = true;
+    }
+    if (documentoDisponible('LiberacionTesis')) {
+        dropdown.append('<option value="LiberacionTesis">Liberación de Tesis</option>');
+        tieneDocumentos = true;
+    }
+    
+    // Nuevos documentos oficiales
+    if (documentoDisponible('AutorizacionImpresion')) {
+        dropdown.append('<option value="AutorizacionImpresion">Autorización de Impresión de Tesis</option>');
+        tieneDocumentos = true;
+    }
+    if (documentoDisponible('AutorizacionActoRecepcion')) {
+        dropdown.append('<option value="AutorizacionActoRecepcion">Autorización de Acto de Recepción</option>');
+        tieneDocumentos = true;
+    }
+    if (documentoDisponible('ConstanciaDictamen')) {
+        dropdown.append('<option value="ConstanciaDictamen">Constancia de Dictamen de Tesis</option>');
+        tieneDocumentos = true;
+    }
+    if (documentoDisponible('AutorizacionExamen')) {
+        dropdown.append('<option value="AutorizacionExamen">Autorización de Examen</option>');
+        tieneDocumentos = true;
+    }
+    if (documentoDisponible('ProtocoloExamen')) {
+        dropdown.append('<option value="ProtocoloExamen">Protocolo de Examen Profesional</option>');
+        tieneDocumentos = true;
+    }
+    
+    // Documentos de revisores (si aplican)
+    if (documentoDisponible('revisores')) {
+        dropdown.append('<option value="revisores">Documentos de Revisores (Cartas + Notificación)</option>');
+        tieneDocumentos = true;
+    }
+    
+    // Mostrar mensaje si no hay documentos disponibles
+    if (!tieneDocumentos) {
+        $('#sin-documentos-alerta').show();
+        $('#btn-generar-submit').prop('disabled', true);
+    } else {
+        $('#sin-documentos-alerta').hide();
+    }
+}
+
+// Función para mostrar el PDF en un modal después de generarlo
+function mostrarPDFenModal(response) {
+    if (response.success) {
+        // Crear modal para mostrar el PDF
+        var modalHTML = '\
+        <div class="modal fade" id="pdfModal" tabindex="-1" aria-labelledby="pdfModalLabel" aria-hidden="true">\
+            <div class="modal-dialog modal-xl">\
+                <div class="modal-content">\
+                    <div class="modal-header bg-primary text-white">\
+                        <h5 class="modal-title" id="pdfModalLabel">Documento Generado</h5>\
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>\
+                    </div>\
+                    <div class="modal-body">\
+                        <div class="text-center mb-3">\
+                            <a href="' + response.downloadUrl + '" class="btn btn-success me-2" target="_blank">\
+                                <i class="fas fa-download"></i> Descargar PDF\
+                            </a>\
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">\
+                                <i class="fas fa-times"></i> Cerrar\
+                            </button>\
+                        </div>\
+                        <iframe src="' + response.pdfUrl + '" width="100%" height="600px" style="border: 1px solid #ddd;"></iframe>\
+                    </div>\
+                </div>\
+            </div>\
+        </div>';
+        
+        // Agregar el modal al DOM
+        $('body').append(modalHTML);
+        
+        // Mostrar el modal
+        $('#pdfModal').modal('show');
+        
+        // Eliminar el modal cuando se cierre
+        $('#pdfModal').on('hidden.bs.modal', function () {
+            $(this).remove();
+        });
+    }
+}
+
+// Verificar si hay al menos un documento disponible
+function verificarDocumentosDisponibles() {
+    var disponible = false;
+    for (var tipo in requisitosPorTipo) {
+        if (requisitosPorTipo[tipo].cumplido) {
+            disponible = true;
+            break;
+        }
+    }
+    
+    var btn = $('#btn-generar-documento');
+    if (disponible) {
+        btn.prop('disabled', false);
+        btn.removeClass('btn-secondary').addClass('btn-primary');
+    } else {
+        btn.prop('disabled', true);
+        btn.removeClass('btn-primary').addClass('btn-secondary');
+    }
+}
+
+// Manejar el envío del formulario de generación de documentos
+$('#generar-documento-form').on('submit', function(e) {
+    e.preventDefault();
+    
+    var tipoDocumento = $('#tipo-documento').val();
+    
+    if (!tipoDocumento) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Seleccione un documento',
+            text: 'Por favor seleccione un tipo de documento para generar.',
+            confirmButtonText: 'Entendido'
+        });
         return false;
     }
     
-    // Mostrar loading
-    const btn = document.getElementById('btn-generar-revisores');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
-    btn.disabled = true;
+    if (!documentoDisponible(tipoDocumento)) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Requisitos pendientes',
+            html: 'No cumple con todos los requisitos para generar este documento.',
+            confirmButtonText: 'Entendido'
+        });
+        return false;
+    }
     
-    // Mostrar contenedor de documentos
-    $('#documentos-generados-container').show();
-    $('#documentos-content').html('<div class="text-center p-3"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Generando documentos...</p></div>');
+    var form = $(this);
+    var btn = form.find('button[type="submit"]');
+    var originalText = btn.html();
     
-    // Realizar petición AJAX
+    btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
+    btn.prop('disabled', true);
+    
     $.ajax({
-        url: '$urlGenerarPdf',
+        url: form.attr('action'),
         type: 'POST',
+        data: form.serialize(),
         dataType: 'json',
-        data: {
-            id: alumnoId,
-            tipo_documento: 'revisores',
-            _csrf: yii.getCsrfToken()
-        },
         success: function(response) {
-            console.log('Respuesta del servidor:', response);
-            
-            // Restaurar botón
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            btn.html(originalText);
+            btn.prop('disabled', false);
             
             if (response.success) {
-                // Mostrar documentos generados
-                mostrarDocumentosGenerados(response);
-                mostrarModalDocumentos(response);
-            } else {
-                $('#documentos-content').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> Error: ' + response.error + '</div>');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Error en AJAX:', {
-                status: xhr.status,
-                statusText: xhr.statusText,
-                responseText: xhr.responseText
-            });
-            
-            // Restaurar botón
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            
-            let errorMsg = 'Error al generar documentos: ';
-            
-            if (xhr.status === 404) {
-                errorMsg += 'Página no encontrada (404). Verifique las rutas.';
-            } else if (xhr.status === 500) {
-                errorMsg += 'Error interno del servidor (500).';
-            } else if (xhr.status === 0) {
-                errorMsg += 'No se pudo conectar al servidor.';
-            } else {
-                errorMsg += xhr.statusText;
-            }
-            
-            $('#documentos-content').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ' + errorMsg + '</div>');
-        }
-    });
-}
-
-// Agregar event listener al botón
-$(document).ready(function() {
-    $('#btn-generar-revisores').click(function() {
-        const alumnoId = $(this).data('alumno-id');
-        generarDocumentosRevisores(alumnoId);
-    });
-});
-
-// Función para mostrar los documentos generados en un modal
-function mostrarModalDocumentos(response) {
-    // Crear contenido del modal
-    let modalContent = '<div class="modal fade" id="documentosModal" tabindex="-1" aria-labelledby="documentosModalLabel" aria-hidden="true">';
-    modalContent += '<div class="modal-dialog modal-lg">';
-    modalContent += '<div class="modal-content">';
-    modalContent += '<div class="modal-header bg-success text-white">';
-    modalContent += '<h5 class="modal-title" id="documentosModalLabel"><i class="fas fa-file-pdf"></i> Documentos Generados</h5>';
-    modalContent += '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>';
-    modalContent += '</div>';
-    modalContent += '<div class="modal-body">';
-    
-    // Documento 002 - Notificación al alumno
-    if (response.documento002) {
-        modalContent += '<div class="mb-4">';
-        modalContent += '<h5><i class="fas fa-file-alt"></i> Documento 002 - Notificación al Alumno</h5>';
-        modalContent += '<div class="d-flex gap-2 mt-2">';
-        modalContent += '<a href="' + response.documento002.viewUrl + '" target="_blank" class="btn btn-outline-primary">';
-        modalContent += '<i class="fas fa-eye"></i> Ver Documento';
-        modalContent += '</a>';
-        modalContent += '<a href="' + response.documento002.downloadUrl + '" class="btn btn-outline-success">';
-        modalContent += '<i class="fas fa-download"></i> Descargar PDF';
-        modalContent += '</a>';
-        modalContent += '</div>';
-        modalContent += '</div>';
-    }
-    
-    // Documentos 001 - Cartas individuales
-    if (response.documentos001 && response.documentos001.length > 0) {
-        modalContent += '<div class="mb-3">';
-        modalContent += '<h5><i class="fas fa-envelope"></i> Documentos 001 - Cartas para Revisores</h5>';
-        
-        response.documentos001.forEach(function(doc, index) {
-            modalContent += '<div class="card mt-2">';
-            modalContent += '<div class="card-body">';
-            modalContent += '<h6 class="card-title">' + doc.revisorNombre + '</h6>';
-            modalContent += '<div class="d-flex gap-2">';
-            modalContent += '<a href="' + doc.viewUrl + '" target="_blank" class="btn btn-outline-primary btn-sm">';
-            modalContent += '<i class="fas fa-eye"></i> Ver';
-            modalContent += '</a>';
-            modalContent += '<a href="' + doc.downloadUrl + '" class="btn btn-outline-success btn-sm">';
-            modalContent += '<i class="fas fa-download"></i> Descargar';
-            modalContent += '</a>';
-            modalContent += '</div>';
-            modalContent += '</div>';
-            modalContent += '</div>';
-        });
-        
-        modalContent += '</div>';
-    }
-    
-    modalContent += '</div>';
-    modalContent += '<div class="modal-footer">';
-    modalContent += '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>';
-    modalContent += '</div>';
-    modalContent += '</div>';
-    modalContent += '</div>';
-    modalContent += '</div>';
-    
-    // Agregar el modal al DOM y mostrarlo
-    $('body').append(modalContent);
-    $('#documentosModal').modal('show');
-    
-    // Remover el modal cuando se cierre
-    $('#documentosModal').on('hidden.bs.modal', function () {
-        $(this).remove();
-    });
-}
-
-// Función para mostrar los documentos generados en el contenedor
-function mostrarDocumentosGenerados(response) {
-    const content = $('#documentos-content');
-    
-    let html = '<div class="alert alert-success">';
-    html += '<i class="fas fa-check-circle"></i> Documentos generados correctamente. ';
-    html += '<a href="#" onclick="$(\'#documentosModal\').modal(\'show\'); return false;">Ver documentos</a>';
-    html += '</div>';
-    
-    content.html(html);
-}
-
-// JavaScript para manejar la generación de documentos del modal
-$(document).ready(function() {
-    // Manejar el envío del formulario de generación de documentos
-    $('#generar-documento-form').on('submit', function(e) {
-        e.preventDefault();
-        
-        var form = $(this);
-        var btn = form.find('button[type="submit"]');
-        var originalText = btn.html();
-        
-        btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
-        btn.prop('disabled', true);
-        
-        $.ajax({
-            url: form.attr('action'),
-            type: 'POST',
-            data: form.serialize(),
-            dataType: 'json',
-            success: function(response) {
-                btn.html(originalText);
-                btn.prop('disabled', false);
+                // Cerrar el modal de generación
+                $('#generarDocumentoModal').modal('hide');
                 
-                if (response.success) {
-                    // Cerrar el modal
-                    $('#generarDocumentoModal').modal('hide');
-                    
-                    // Descargar automáticamente el PDF
-                    window.open(response.downloadUrl, '_blank');
-                    
-                    // Mostrar mensaje de éxito
+                // Mostrar el PDF en un modal
+                mostrarPDFenModal(response);
+                
+            } else {
+                // Mostrar mensaje de error específico
+                let errorMsg = response.error || 'Error al generar el documento';
+                
+                // Si es error de requisitos, mostrar de manera especial
+                if (errorMsg.includes('Requisitos')) {
                     Swal.fire({
-                        icon: 'success',
-                        title: '¡Documento generado!',
-                        html: 'El documento se ha creado correctamente.<br><br>' +
-                              '<div class="text-center">' +
-                              '<a href="' + response.downloadUrl + '" class="btn btn-primary m-1">' +
-                              '<i class="fas fa-download"></i> Descargar PDF</a> ' +
-                              '<a href="' + response.viewUrl + '" target="_blank" class="btn btn-info m-1">' +
-                              '<i class="fas fa-eye"></i> Ver documento</a>' +
-                              '</div>',
-                        showConfirmButton: true,
-                        confirmButtonText: 'Aceptar'
+                        icon: 'warning',
+                        title: 'Requisitos pendientes',
+                        html: '<div class="text-left">' + errorMsg + '</div>',
+                        confirmButtonText: 'Entendido'
                     });
                 } else {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: response.error || 'Error al generar el documento'
+                        text: errorMsg
                     });
                 }
-            },
-            error: function(xhr) {
-                btn.html(originalText);
-                btn.prop('disabled', false);
-                
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de conexión',
-                    text: 'No se pudo conectar con el servidor'
-                });
             }
-        });
-    });
-    
-    $('#tipo-documento').change(function() {
-        var tipo = $(this).val();
-        var camposDiv = $('#campos-dinamicos');
-        camposDiv.empty();
-        
-        switch(tipo) {
-            case 'LiberacionIngles':
-                camposDiv.html('\
-                    <div class="form-group">\
-                        <label for="articulo">Título del Artículo</label>\
-                        <input type="text" class="form-control" id="articulo" name="articulo" required>\
-                        <small class="form-text text-muted">Ingrese el título del artículo en inglés</small>\
-                    </div>\
-                ');
-                break;
-                
-            case 'Estancia':
-                camposDiv.html('\
-                    <div class="row">\
-                        <div class="col-md-6">\
-                            <div class="form-group">\
-                                <label for="fecha_inicio">Fecha de Inicio</label>\
-                                <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" required>\
-                            </div>\
-                        </div>\
-                        <div class="col-md-6">\
-                            <div class="form-group">\
-                                <label for="fecha_fin">Fecha de Fin</label>\
-                                <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" required>\
-                            </div>\
-                        </div>\
-                    </div>\
-                    <div class="form-group">\
-                        <label for="asesor">Asesor</label>\
-                        <input type="text" class="form-control" id="asesor" name="asesor" value="MCIB. Juana Selvan García">\
-                    </div>\
-                    <div class="form-group">\
-                        <label for="proyecto">Proyecto</label>\
-                        <input type="text" class="form-control" id="proyecto" name="proyecto" value="Tesis de {$model->programa->nombre}">\
-                    </div>\
-                ');
-                break;
-                
-            case 'LiberacionTesis':
-            case 'Constancia':
-                // No requiere campos adicionales
-                break;
+        },
+        error: function(xhr) {
+            btn.html(originalText);
+            btn.prop('disabled', false);
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de conexión',
+                text: 'No se pudo conectar con el servidor. Status: ' + xhr.status
+            });
         }
     });
+});
+
+// Manejar cambio en el tipo de documento
+$('#tipo-documento').change(function() {
+    var tipo = $(this).val();
+    var camposDiv = $('#campos-dinamicos');
+    var btnSubmit = $('#btn-generar-submit');
     
-    // Diagnóstico inicial
+    camposDiv.empty();
+    
+    if (!tipo) {
+        btnSubmit.prop('disabled', true);
+        return;
+    }
+    
+    // Habilitar el botón de submit
+    btnSubmit.prop('disabled', false);
+    
+    switch(tipo) {
+        case 'LiberacionIngles':
+            camposDiv.html('\
+                <div class="form-group">\
+                    <label for="articulo">Título del Artículo</label>\
+                    <input type="text" class="form-control" id="articulo" name="articulo" required>\
+                    <small class="form-text text-muted">Ingrese el título del artículo en inglés</small>\
+                </div>\
+            ');
+            break;
+            
+        case 'LiberacionTesis':
+            camposDiv.html('\
+                <div class="form-group">\
+                    <label for="titulo_tesis">Título de Tesis</label>\
+                    <textarea class="form-control" id="titulo_tesis" name="titulo_tesis" rows="3" required>$tituloTesis</textarea>\
+                    <small class="form-text text-muted">Ingrese el título completo de la tesis</small>\
+                </div>\
+                <div class="form-group">\
+                    <label for="lgac_tesis">LGAC</label>\
+                    <input type="text" class="form-control" id="lgac_tesis" name="lgac_tesis" value="Calidad y Sustentabilidad en las Organizaciones" required>\
+                    <small class="form-text text-muted">Ingrese la LGAC correspondiente</small>\
+                </div>\
+                <div class="form-group">\
+                    <label for="porcentaje_coincidencia">Porcentaje de Coincidencia Turnitin</label>\
+                    <input type="number" class="form-control" id="porcentaje_coincidencia" name="porcentaje_coincidencia" min="0" max="100" value="10" required>\
+                    <small class="form-text text-muted">Ingrese el porcentaje de coincidencia reportado por Turnitin</small>\
+                </div>\
+            ');
+            break;
+            
+        case 'AutorizacionExamen':
+            camposDiv.html('\
+                <div class="form-group">\
+                    <label for="titulo_tesis">Título de Tesis</label>\
+                    <textarea class="form-control" id="titulo_tesis" name="titulo_tesis" rows="3" required>$tituloTesis</textarea>\
+                    <small class="form-text text-muted">Ingrese el título completo de la tesis</small>\
+                </div>\
+                <div class="row">\
+                    <div class="col-md-6">\
+                        <div class="form-group">\
+                            <label for="fecha_examen">Fecha del Examen</label>\
+                            <input type="date" class="form-control" id="fecha_examen" name="fecha_examen" required>\
+                        </div>\
+                    </div>\
+                    <div class="col-md-6">\
+                        <div class="form-group">\
+                            <label for="hora_examen">Hora del Examen</label>\
+                            <input type="time" class="form-control" id="hora_examen" name="hora_examen" value="10:00" required>\
+                        </div>\
+                    </div>\
+                </div>\
+            ');
+            break;
+            
+        case 'ConstanciaDictamen':
+            camposDiv.html('\
+                <div class="form-group">\
+                    <label for="titulo_tesis">Título de Tesis</label>\
+                    <textarea class="form-control" id="titulo_tesis" name="titulo_tesis" rows="3" required>$tituloTesis</textarea>\
+                    <small class="form-text text-muted">Ingrese el título completo de la tesis</small>\
+                </div>\
+                <div class="form-group">\
+                    <label for="lgac_tesis">LGAC</label>\
+                    <input type="text" class="form-control" id="lgac_tesis" name="lgac_tesis" value="Calidad y Sustentabilidad en las Organizaciones">\
+                    <small class="form-text text-muted">Ingrese la LGAC correspondiente</small>\
+                </div>\
+            ');
+            break;
+            
+        case 'AutorizacionActoRecepcion':
+            camposDiv.html('\
+                <div class="form-group">\
+                    <label for="titulo_tesis">Título de Tesis</label>\
+                    <textarea class="form-control" id="titulo_tesis" name="titulo_tesis" rows="3" required>$tituloTesis</textarea>\
+                    <small class="form-text text-muted">Ingrese el título completo de la tesis</small>\
+                </div>\
+                <div class="form-group">\
+                    <label for="tipo_revisor">Tipo de Revisor</label>\
+                    <select class="form-control" id="tipo_revisor" name="tipo_revisor" required>\
+                        <option value="PRESIDENTE">Presidente</option>\
+                        <option value="SECRETARIO">Secretario</option>\
+                        <option value="VOCAL">Vocal</option>\
+                    </select>\
+                    <small class="form-text text-muted">Seleccione el tipo de revisor</small>\
+                </div>\
+                <div class="row">\
+                    <div class="col-md-6">\
+                        <div class="form-group">\
+                            <label for="fecha_acto">Fecha del Acto</label>\
+                            <input type="date" class="form-control" id="fecha_acto" name="fecha_acto" required>\
+                        </div>\
+                    </div>\
+                    <div class="col-md-6">\
+                        <div class="form-group">\
+                            <label for="hora_acto">Hora del Acto</label>\
+                            <input type="time" class="form-control" id="hora_acto" name="hora_acto" value="10:00" required>\
+                        </div>\
+                    </div>\
+                </div>\
+            ');
+            break;
+            
+        case 'ProtocoloExamen':
+            camposDiv.html('\
+                <div class="form-group">\
+                    <label for="titulo_tesis">Título de Tesis</label>\
+                    <textarea class="form-control" id="titulo_tesis" name="titulo_tesis" rows="3" required>$tituloTesis</textarea>\
+                    <small class="form-text text-muted">Ingrese el título completo de la tesis</small>\
+                </div>\
+                <div class="row">\
+                    <div class="col-md-6">\
+                        <div class="form-group">\
+                            <label for="fecha_examen">Fecha del Examen</label>\
+                            <input type="date" class="form-control" id="fecha_examen" name="fecha_examen" required>\
+                        </div>\
+                    </div>\
+                    <div class="col-md-6">\
+                        <div class="form-group">\
+                            <label for="hora_examen">Hora del Examen</label>\
+                            <input type="time" class="form-control" id="hora_examen" name="hora_examen" value="10:00" required>\
+                        </div>\
+                    </div>\
+                </div>\
+                <div class="form-group">\
+                    <label for="presidente">Presidente del Jurado</label>\
+                    <input type="text" class="form-control" id="presidente" name="presidente" required>\
+                    <small class="form-text text-muted">Nombre completo del presidente del jurado</small>\
+                </div>\
+                <div class="form-group">\
+                    <label for="secretario">Secretario del Jurado</label>\
+                    <input type="text" class="form-control" id="secretario" name="secretario" required>\
+                    <small class="form-text text-muted">Nombre completo del secretario del jurado</small>\
+                </div>\
+                <div class="form-group">\
+                    <label for="vocal">Vocal del Jurado</label>\
+                    <input type="text" class="form-control" id="vocal" name="vocal" required>\
+                    <small class="form-text text-muted">Nombre completo del vocal del jurado</small>\
+                </div>\
+                <div class="form-group">\
+                    <label for="vocal_suplente">Vocal Suplente (Opcional)</label>\
+                    <input type="text" class="form-control" id="vocal_suplente" name="vocal_suplente">\
+                    <small class="form-text text-muted">Nombre completo del vocal suplente (opcional)</small>\
+                </div>\
+            ');
+            break;
+            
+        case 'revisores':
+            camposDiv.html('\
+                <div class="alert alert-info">\
+                    <i class="fas fa-info-circle"></i> Se generarán 4 cartas individuales para revisores + 1 notificación al alumno\
+                </div>\
+            ');
+            break;
+            
+        default:
+            camposDiv.html('\
+                <div class="alert alert-info">\
+                    <i class="fas fa-info-circle"></i> No se requieren datos adicionales para este documento\
+                </div>\
+            ');
+    }
+});
+
+// Inicializar la verificación de documentos disponibles
+$(document).ready(function() {
+    verificarDocumentosDisponibles();
+    llenarDropdownDocumentos();
     console.log('Página cargada correctamente');
-    console.log('Función generarDocumentosRevisores definida');
+    
+    // Cuando se abre el modal, asegurarse de que el dropdown esté actualizado
+    $('#generarDocumentoModal').on('show.bs.modal', function () {
+        llenarDropdownDocumentos();
+    });
 });
 JS;
 

@@ -24,6 +24,11 @@ $config = [
         'cache' => [
             'class' => 'yii\caching\FileCache',
         ],
+        'pdf' => [
+        'class' => '\Mpdf\Mpdf',
+        'format' => 'A4',
+        'orientation' => 'P',
+        ],
         'user' => [
             'identityClass' => 'app\models\User',
             'enableAutoLogin' => true,

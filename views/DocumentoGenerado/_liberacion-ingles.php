@@ -8,6 +8,7 @@ use yii\helpers\Url;
 /* @var $articulo string */
 ?>
 <div style="font-family: 'Times New Roman'; margin: 2cm; line-height: 1.5;">
+    <div style="height: 3cm;"></div>
     <p style="text-align: right;">Villahermosa, Tabasco, <?= Html::encode($fecha) ?></p>
 
     <p style="text-align: center;"><strong>NO. DE OFICIO:</strong> <?= Html::encode($numeroOficio) ?></p>

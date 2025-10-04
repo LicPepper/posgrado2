@@ -30,7 +30,7 @@ $csrfToken = Yii::$app->request->csrfToken;
                 <div class="col-md-8">
                     <div class="alert alert-info">
                         <strong><i class="fas fa-info-circle"></i> Importante:</strong>
-                        Debe seleccionar exactamente 4 revisores para este alumno.
+                        Debe seleccionar exactamente 4 revisores(min y max) para continuar con el proceso.
                     </div>
                     
                     <h4>Seleccionar Revisores</h4>
@@ -182,73 +182,74 @@ $(document).ready(function() {
     $('.revisor-checkbox').change(updateSelectedCount);
     
     // Función para mostrar documentos en modal completo (como en view.php)
-    function mostrarModalDocumentosCompleto(response) {
-        // Crear contenido del modal
-        let modalContent = '<div class="modal fade" id="documentosModalCompleto" tabindex="-1" aria-labelledby="documentosModalCompletoLabel" aria-hidden="true">';
-        modalContent += '<div class="modal-dialog modal-lg">';
-        modalContent += '<div class="modal-content">';
-        modalContent += '<div class="modal-header bg-success text-white">';
-        modalContent += '<h5 class="modal-title" id="documentosModalCompletoLabel"><i class="fas fa-file-pdf"></i> Documentos Generados</h5>';
-        modalContent += '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>';
-        modalContent += '</div>';
-        modalContent += '<div class="modal-body">';
-        
-        // Documento 002 - Notificación al alumno
-        if (response.documento002) {
-            modalContent += '<div class="mb-4">';
-            modalContent += '<h5><i class="fas fa-file-alt"></i> Documento 002 - Notificación al Alumno</h5>';
-            modalContent += '<div class="d-flex gap-2 mt-2">';
-            modalContent += '<a href="' + response.documento002.viewUrl + '" target="_blank" class="btn btn-outline-primary">';
-            modalContent += '<i class="fas fa-eye"></i> Ver Documento';
-            modalContent += '</a>';
-            modalContent += '<a href="' + response.documento002.downloadUrl + '" class="btn btn-outline-success">';
-            modalContent += '<i class="fas fa-download"></i> Descargar PDF';
-            modalContent += '</a>';
-            modalContent += '</div>';
-            modalContent += '</div>';
-        }
-        
-        // Documentos 001 - Cartas individuales
-        if (response.documentos001 && response.documentos001.length > 0) {
-            modalContent += '<div class="mb-3">';
-            modalContent += '<h5><i class="fas fa-envelope"></i> Documentos 001 - Cartas para Revisores</h5>';
-            
-            response.documentos001.forEach(function(doc, index) {
-                modalContent += '<div class="card mt-2">';
-                modalContent += '<div class="card-body">';
-                modalContent += '<h6 class="card-title">' + doc.revisorNombre + '</h6>';
-                modalContent += '<div class="d-flex gap-2">';
-                modalContent += '<a href="' + doc.viewUrl + '" target="_blank" class="btn btn-outline-primary btn-sm">';
-                modalContent += '<i class="fas fa-eye"></i> Ver';
-                modalContent += '</a>';
-                modalContent += '<a href="' + doc.downloadUrl + '" class="btn btn-outline-success btn-sm">';
-                modalContent += '<i class="fas fa-download"></i> Descargar';
-                modalContent += '</a>';
-                modalContent += '</div>';
-                modalContent += '</div>';
-                modalContent += '</div>';
-            });
-            
-            modalContent += '</div>';
-        }
-        
-        modalContent += '</div>';
-        modalContent += '<div class="modal-footer">';
-        modalContent += '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>';
+    // Función para mostrar documentos en modal completo
+function mostrarModalDocumentosCompleto(response) {
+    // Crear contenido del modal
+    let modalContent = '<div class="modal fade" id="documentosModalCompleto" tabindex="-1" aria-labelledby="documentosModalCompletoLabel" aria-hidden="true">';
+    modalContent += '<div class="modal-dialog modal-lg">';
+    modalContent += '<div class="modal-content">';
+    modalContent += '<div class="modal-header bg-success text-white">';
+    modalContent += '<h5 class="modal-title" id="documentosModalCompletoLabel"><i class="fas fa-file-pdf"></i> Documentos Generados</h5>';
+    modalContent += '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>';
+    modalContent += '</div>';
+    modalContent += '<div class="modal-body">';
+    
+    // Documento 002 - Notificación al alumno
+    if (response.documento002) {
+        modalContent += '<div class="mb-4">';
+        modalContent += '<h5><i class="fas fa-file-alt"></i> Documento 002 - Notificación al Alumno</h5>';
+        modalContent += '<div class="d-flex gap-2 mt-2">';
+        modalContent += '<a href="' + response.documento002.viewUrl + '" target="_blank" class="btn btn-outline-primary">';
+        modalContent += '<i class="fas fa-eye"></i> Ver Documento';
+        modalContent += '</a>';
+        modalContent += '<a href="' + response.documento002.downloadUrl + '" class="btn btn-outline-success">';
+        modalContent += '<i class="fas fa-download"></i> Descargar PDF';
+        modalContent += '</a>';
         modalContent += '</div>';
         modalContent += '</div>';
-        modalContent += '</div>';
-        modalContent += '</div>';
-        
-        // Agregar el modal al DOM y mostrarlo
-        $('body').append(modalContent);
-        $('#documentosModalCompleto').modal('show');
-        
-        // Remover el modal cuando se cierre
-        $('#documentosModalCompleto').on('hidden.bs.modal', function () {
-            $(this).remove();
-        });
     }
+    
+    // Documentos 001 - Cartas individuales
+    if (response.documentos001 && response.documentos001.length > 0) {
+        modalContent += '<div class="mb-3">';
+        modalContent += '<h5><i class="fas fa-envelope"></i> Documentos 001 - Cartas para Revisores</h5>';
+        
+        response.documentos001.forEach(function(doc, index) {
+            modalContent += '<div class="card mt-2">';
+            modalContent += '<div class="card-body">';
+            modalContent += '<h6 class="card-title">' + doc.revisorNombre + '</h6>';
+            modalContent += '<div class="d-flex gap-2">';
+            modalContent += '<a href="' + doc.viewUrl + '" target="_blank" class="btn btn-outline-primary btn-sm">';
+            modalContent += '<i class="fas fa-eye"></i> Ver';
+            modalContent += '</a>';
+            modalContent += '<a href="' + doc.downloadUrl + '" class="btn btn-outline-success btn-sm">';
+            modalContent += '<i class="fas fa-download"></i> Descargar';
+            modalContent += '</a>';
+            modalContent += '</div>';
+            modalContent += '</div>';
+            modalContent += '</div>';
+        });
+        
+        modalContent += '</div>';
+    }
+    
+    modalContent += '</div>';
+    modalContent += '<div class="modal-footer">';
+    modalContent += '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>';
+    modalContent += '</div>';
+    modalContent += '</div>';
+    modalContent += '</div>';
+    modalContent += '</div>';
+    
+    // Agregar el modal al DOM y mostrarlo
+    $('body').append(modalContent);
+    $('#documentosModalCompleto').modal('show');
+    
+    // Remover el modal cuando se cierre
+    $('#documentosModalCompleto').on('hidden.bs.modal', function () {
+        $(this).remove();
+    });
+}
     
     // Generar documentos y mostrar en modal
     $('#btn-generar').click(function() {

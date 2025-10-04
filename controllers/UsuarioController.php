@@ -196,7 +196,8 @@ class UsuarioController extends Controller
         
         if ($model->save()) {
             Yii::$app->session->setFlash('success', 'Usuario creado exitosamente.');
-            return $this->redirect(['view', 'id' => $model->id]);
+            // Redirigir al listado de usuarios en lugar de a la vista del usuario
+            return $this->redirect(['index']);
         }
     }
 

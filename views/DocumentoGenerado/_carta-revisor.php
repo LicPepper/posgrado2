@@ -1,8 +1,12 @@
 <?php
 use yii\helpers\Html;
 ?>
-<div style="font-family: 'Times New Roman', Times, serif; font-size: 11.5pt; line-height: 1.3;">
 
+<div class="texto-documento">
+    <!-- Espacio superior de 4cm -->
+    <div style="height: 4cm;"></div>
+
+    <!-- CONTENIDO ESPECÍFICO DEL DOCUMENTO 001 -->
     <table width="100%" style="border-collapse: collapse;">
         <tr>
             <td width="50%" style="text-align: left;">
@@ -49,5 +53,4 @@ use yii\helpers\Html;
         <p>David Antonio García Reyes – Coordinador de la Maestría</p>
         <p>FLV/dang</p>
     </div>
-
 </div>
